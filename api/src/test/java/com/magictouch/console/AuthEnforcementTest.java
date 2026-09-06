@@ -105,6 +105,22 @@ class AuthEnforcementTest {
                 .body("size()", is(6));
     }
 
+    // --- CORS preflight -------------------------------------------------
+
+    /**
+     * A preflight carries no Authorization header. If the auth policy answers
+     * it with 401 the response has no Access-Control-Allow-Origin, and the
+     * browser blocks the real request that would have followed.
+     */
+    @Test
+    void corsPreflightIsNotBlockedByAuth() {
+        given().header("Origin", "http://localhost:5173")
+                .header("Access-Control-Request-Method", "GET")
+                .when().options("/api/v1/modules")
+                .then().statusCode(200)
+                .header("access-control-allow-origin", "http://localhost:5173");
+    }
+
     // --- health stays open for the platform probe ----------------------
 
     @Test
