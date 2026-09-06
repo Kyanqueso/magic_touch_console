@@ -1,0 +1,28 @@
+# dependencies
+**/node_modules
+
+# build output
+**/dist
+
+# env
+.env
+.env.local
+.env.*.local
+
+# scratch notes — currently holds the Supabase DB password, the pooler
+# connection string and the anon key. Rotate that password, then clear this
+# file out; the ignore stays as a safety net either way.
+notes.txt
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+
+# editor / OS
+.DS_Store
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# Claude AI
+/.claude

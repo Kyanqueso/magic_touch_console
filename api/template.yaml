@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Magic Touch Console API - Quarkus on Lambda behind a Function URL.
+
+Parameters:
+  DbUrl:
+    Type: String
+    Description: Supavisor pooler, transaction mode, port 6543.
+  DbUser:
+    Type: String
+    Description: postgres.<project-ref>
+  DbPassword:
+    Type: String
+    NoEcho: true
+    # Do not write CloudFormation dynamic-reference syntax anywhere in this
+    # file, not even in a description - it fails the changeset.
+  CorsOrigins:
+    Type: String
+    Description: Exact frontend origin, no trailing slash.
+  SupabaseJwksUrl:
+    Type: String
+    Description: Public keys for token verification. No secret, and rotation needs no redeploy.
+  SupabaseIssuer:
+    Type: String
+    Description: Expected iss claim, so tokens from another project are rejected.
+  SupabaseUrl:
+    Type: String
+  SupabaseServiceRoleKey:
+    Type: String
+    NoEcho: true
+    Description: Creates and deletes logins. Bypasses RLS; never send it to the browser.
+  ReservedConcurrency:
+    Type: Number
+    Default: 0
+    # Must stay 0 on a new AWS account: the cap is 10 total executions, and
+    # reserving any of them fails the deploy.
+    Description: Simultaneous executions to reserve. 0 means do not reserve.
+  FunctionUrlAuthType:
+    Type: String
+    Default: AWS_IAM
+    AllowedValues: [AWS_IAM, NONE]
+    # AWS_IAM keeps the endpoint closed to browsers while you test with awscurl.
+    Description: Switch to NONE only once the frontend is deployed.
+
+Conditions:
+  # The property must be absent, not 0 - 0 means "throttle to zero invocations".
+  ReserveConcurrency: !Not [!Equals [!Ref ReservedConcurrency, 0]]
+
+Resources:
+  ConsoleApi:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: magic-touch-console-api
+      Handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+      # java21, not the java17 Quarkus generates: the pom compiles to 21.
+      Runtime: java21
+      CodeUri: target/function.zip
+      MemorySize: 1024
+      # Cold start is ~10s, so 30 rather than Lambda's 3s default.
+      Timeout: 30
+      ReservedConcurrentExecutions: !If
+        - ReserveConcurrency
+        - !Ref ReservedConcurrency
+        - !Ref AWS::NoValue
+      Policies: AWSLambdaBasicExecutionRole
+      Environment:
+        Variables:
+          QUARKUS_PROFILE: prod
+          DB_URL: !Ref DbUrl
+          DB_USER: !Ref DbUser
+          DB_PASSWORD: !Ref DbPassword
+          CORS_ORIGINS: !Ref CorsOrigins
+          SUPABASE_JWKS_URL: !Ref SupabaseJwksUrl
+          SUPABASE_ISSUER: !Ref SupabaseIssuer
+          SUPABASE_URL: !Ref SupabaseUrl
+          SUPABASE_SERVICE_ROLE_KEY: !Ref SupabaseServiceRoleKey
+      FunctionUrlConfig:
+        AuthType: !Ref FunctionUrlAuthType
+        # No Cors block: Quarkus already sends those headers, and duplicates
+        # make browsers reject the response.
+
+  ConsoleApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/magic-touch-console-api
+      # CloudWatch keeps logs forever by default.
+      RetentionInDays: 14
+
+Outputs:
+  FunctionUrl:
+    Description: Set this as VITE_API_URL in the frontend build.
+    Value: !GetAtt ConsoleApiUrl.FunctionUrl
+  FunctionName:
+    Value: !Ref ConsoleApi

@@ -1,0 +1,138 @@
+package com.magictouch.console.purchasing.domain;
+
+import com.magictouch.console.common.error.ApiException;
+import com.magictouch.console.common.page.PageQuery;
+import com.magictouch.console.common.page.PageResponse;
+import com.magictouch.console.common.page.SortSpec;
+import com.magictouch.console.purchasing.api.dto.VoucherRequest;
+import com.magictouch.console.purchasing.api.dto.VoucherResponse;
+import com.magictouch.console.purchasing.api.dto.VoucherSummaryRow;
+import com.magictouch.console.purchasing.data.SupplierInvoice;
+import com.magictouch.console.purchasing.data.SupplierInvoiceRepository;
+import com.magictouch.console.purchasing.data.Voucher;
+import com.magictouch.console.purchasing.data.VoucherRepository;
+import io.quarkus.hibernate.orm.panache.PanacheQuery;
+import io.quarkus.panache.common.Sort;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+@ApplicationScoped
+public class VoucherService {
+
+    private static final Map<String, String> SORTABLE = Map.of("id", "id", "voucherDate", "voucherDate");
+    private static final Sort DEFAULT_SORT = Sort.by("id", Sort.Direction.Descending);
+
+    private final VoucherRepository repo;
+    private final SupplierInvoiceRepository invoices;
+    private final PurchasingLookups lookups;
+
+    public VoucherService(VoucherRepository repo, SupplierInvoiceRepository invoices,
+                          PurchasingLookups lookups) {
+        this.repo = repo;
+        this.invoices = invoices;
+        this.lookups = lookups;
+    }
+
+    public PageResponse<VoucherSummaryRow> list(long profileId, long supplierId, PageQuery page,
+                                                String sort, String q, boolean archived) {
+        lookups.requireLocalSupplier(profileId, supplierId);
+        Sort s = SortSpec.parse(sort, SORTABLE, DEFAULT_SORT);
+        PanacheQuery<Voucher> query = repo.search(profileId, supplierId, archived, q, s);
+        long total = query.count();
+        List<VoucherSummaryRow> items = query.page(page.index(), page.size())
+                .list().stream().map(VoucherSummaryRow::from).toList();
+        return PageResponse.of(items, page, total);
+    }
+
+    public VoucherResponse get(long profileId, long supplierId, long id) {
+        return VoucherResponse.from(require(profileId, supplierId, id));
+    }
+
+    @Transactional
+    public VoucherResponse create(long profileId, long supplierId, VoucherRequest body) {
+        lookups.requireLocalSupplier(profileId, supplierId);
+        Voucher v = new Voucher();
+        v.corporateProfileId = profileId;
+        v.supplierInvoice = requireInvoice(profileId, supplierId, body.supplierInvoiceId());
+        apply(v, body);
+        repo.persist(v);
+        return VoucherResponse.from(v);
+    }
+
+    @Transactional
+    public VoucherResponse update(long profileId, long supplierId, long id, VoucherRequest body) {
+        Voucher v = require(profileId, supplierId, id);
+        v.supplierInvoice = requireInvoice(profileId, supplierId, body.supplierInvoiceId());
+        apply(v, body);
+        return VoucherResponse.from(v);
+    }
+
+    @Transactional
+    public VoucherResponse setPaid(long profileId, long supplierId, long id, boolean paid) {
+        Voucher v = require(profileId, supplierId, id);
+        v.paid = paid;
+        v.paidAt = paid ? OffsetDateTime.now() : null;
+        return VoucherResponse.from(v);
+    }
+
+    @Transactional
+    public void archive(long profileId, long supplierId, long id) {
+        Voucher v = require(profileId, supplierId, id);
+        if (v.archivedAt == null) {
+            v.archivedAt = OffsetDateTime.now();
+        }
+    }
+
+    @Transactional
+    public void restore(long profileId, long supplierId, long id) {
+        require(profileId, supplierId, id).archivedAt = null;
+    }
+
+    @Transactional
+    public void delete(long profileId, long supplierId, long id) {
+        Voucher v = require(profileId, supplierId, id);
+        if (v.archivedAt == null) {
+            throw ApiException.conflict("Archive the voucher before deleting it.");
+        }
+        repo.delete(v);
+    }
+
+    private Voucher require(long profileId, long supplierId, long id) {
+        Voucher v = repo.findById(id);
+        if (v == null || !Objects.equals(v.corporateProfileId, profileId)
+                || !Objects.equals(v.supplierInvoice.purchaseOrder.supplier.id, supplierId)) {
+            throw ApiException.notFound("Voucher");
+        }
+        return v;
+    }
+
+    private SupplierInvoice requireInvoice(long profileId, long supplierId, Long invoiceId) {
+        SupplierInvoice s = invoiceId == null ? null : invoices.findById(invoiceId);
+        boolean ok = s != null && s.archivedAt == null
+                && Objects.equals(s.corporateProfileId, profileId)
+                && Objects.equals(s.purchaseOrder.supplier.id, supplierId);
+        if (!ok) {
+            throw ApiException.invalidField("supplierInvoiceId",
+                    "No such active sales invoice for this supplier.");
+        }
+        return s;
+    }
+
+    private void apply(Voucher v, VoucherRequest b) {
+        lookups.checkAccount("debitAccountId", b.debitAccountId());
+        lookups.checkAccount("creditCashAccountId", b.creditCashAccountId());
+        lookups.checkAccount("creditPayableAccountId", b.creditPayableAccountId());
+        v.voucherDate = b.voucherDate();
+        v.netAmount = b.netAmount();
+        v.paid = b.paid();
+        v.paidAt = b.paid() ? (v.paidAt != null ? v.paidAt : OffsetDateTime.now()) : null;
+        v.debitAccountId = b.debitAccountId();
+        v.creditCashAccountId = b.creditCashAccountId();
+        v.creditPayableAccountId = b.creditPayableAccountId();
+    }
+}

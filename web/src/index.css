@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@theme {
+  /* Typography */
+  --font-sans: "Lato", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Brand */
+  --color-purple: #8122E0;
+  --color-purple-hover: #C49EEA;
+  --color-purple-disabled: #BEADC6;
+  --color-purple-light: #CECBF6;
+
+
+  /* Other colors */
+  --color-component-bg: #EEEDFE;
+  --color-secondary-bg: #56526B;
+  --color-white: #FFFFFF;
+  --color-black: #000000;
+
+
+  /* Text */
+  --color-content: #1a1d21;
+  --color-content-muted: #5b6470;
+
+
+  /* Status */
+  --color-success: #0B7A43;
+  --color-success-hover: #086237;
+
+  --color-info: #1A5FD6;
+  --color-info-hover: #154BAA;
+
+  --color-warning: #F48836;
+  --color-warning-hover: #D96F1E;
+
+  --color-danger: #FA0000;
+  --color-danger-hover: #C90000;
+
+  
+  /* Tooltips */
+  --color-success-tooltip-bg: #E7F6EE;
+  --color-success-tooltip-text: #0B5E36;
+  --color-success-tooltip-border: #A7DEC3;
+  --color-success-tooltip-icon: #12A150;
+
+  --color-danger-tooltip-bg: #FEECEC;
+  --color-danger-tooltip-text: #A80D0D;
+  --color-danger-tooltip-border: #F7B8B8;
+  --color-danger-tooltip-icon: #FA0000;
+
+  --color-neutral-tooltip-bg: #F7F4FA;
+  --color-neutral-tooltip-text: #1A1226;
+  --color-neutral-tooltip-border: #E5DFEA;
+  --color-neutral-tooltip-icon: #6B6076;
+}
+
+/* Base */                                                                       
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-component-bg);
+  color: var(--color-content);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Hand cursor on every enabled button (utilities like
+   disabled:cursor-not-allowed still win over this). */
+@layer base {
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* Dropdown / popover entrance */
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+.animate-dropdown {
+  animation: dropdown-in 120ms ease-out;
+  transform-origin: top;
+}
