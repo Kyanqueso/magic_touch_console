@@ -36,6 +36,19 @@ async function request(method, path, body) {
 
   const text = await res.text()
   const data = text ? JSON.parse(text) : null
+
+  // 401 means the token is no longer good - expired, or the account was
+  // deleted while they were using the app. Sign out so the router returns
+  // them to the login page instead of leaving a signed-in shell that fails
+  // every request.
+  //
+  // UNKNOWN_USER is the exception: the token is fine but there is no console
+  // profile for it. Signing out there would just loop them back through a
+  // successful login into the same 401.
+  if (res.status === 401 && data?.error?.code !== 'UNKNOWN_USER') {
+    await supabase.auth.signOut()
+  }
+
   if (!res.ok) throw new ApiError(res.status, data)
   return data
 }
