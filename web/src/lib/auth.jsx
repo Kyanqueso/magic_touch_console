@@ -110,7 +110,7 @@ export function RequireAuth({ children }) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
   if (profileError) {
-    return <NoProfile error={profileError} />
+    return <ProfileErrorScreen error={profileError} />
   }
   return children
 }
@@ -125,23 +125,48 @@ export function RequireModule({ moduleKey, children }) {
   )
 }
 
-function NoProfile({ error }) {
+/**
+ * The profile fetch can fail for very different reasons, and saying "no
+ * console profile" when the API is simply unreachable sends people looking
+ * for the wrong problem.
+ */
+function ProfileErrorScreen({ error }) {
+  const unreachable = error?.status === 0
+  const noProfile = error?.code === 'UNKNOWN_USER' || error?.status === 401
+
+  const title = unreachable ? 'Cannot reach the server' : noProfile ? 'No console profile' : 'Something went wrong'
+  const body = unreachable
+    ? 'The console loaded but the API did not respond. It may be starting up, or unreachable from here.'
+    : noProfile
+      ? 'You signed in successfully, but this login has no profile in the console yet. An administrator needs to add you before you can use it.'
+      : 'The console could not load your profile.'
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-component-bg p-6">
       <div className="max-w-md rounded-xl border border-purple-light bg-white p-8 text-center">
-        <h1 className="text-xl font-extrabold text-content">No console profile</h1>
-        <p className="mt-3 text-base text-content-muted">
-          You signed in successfully, but this login has no profile in the console yet. An
-          administrator needs to add you before you can use it.
-        </p>
-        <p className="mt-3 text-sm text-content-muted">{error?.message}</p>
-        <button
-          type="button"
-          onClick={() => supabase.auth.signOut()}
-          className="mt-6 rounded-lg bg-purple px-4 py-2 text-base font-bold text-white"
-        >
-          Sign out
-        </button>
+        <h1 className="text-xl font-extrabold text-content">{title}</h1>
+        <p className="mt-3 text-base text-content-muted">{body}</p>
+        {!unreachable && error?.message && (
+          <p className="mt-3 text-sm text-content-muted">{error.message}</p>
+        )}
+        <div className="mt-6 flex justify-center gap-3">
+          {unreachable && (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-lg bg-purple px-4 py-2 text-base font-bold text-white"
+            >
+              Try again
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => supabase.auth.signOut()}
+            className="rounded-lg border border-purple-light px-4 py-2 text-base font-bold text-purple"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
     </div>
   )
