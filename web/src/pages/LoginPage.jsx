@@ -8,7 +8,7 @@ import TextField from '../components/TextField.jsx'
 import ResetPasswordModal from '../components/ResetPasswordModal.jsx'
 import { sanitizeEmail, isEmail } from '../lib/masks.js'
 import { supabase } from '../lib/supabase.js'
-import { useAuth } from '../lib/auth.jsx'
+import { useAuth, takeSignOutReason } from '../lib/auth.jsx'
 
 const STATUS = {
   IDLE: 'idle',
@@ -26,6 +26,9 @@ export default function LoginPage() {
   const [status, setStatus] = useState(STATUS.IDLE)
   const [formError, setFormError] = useState('')
   const [resetOpen, setResetOpen] = useState(false)
+
+  // Read once on mount, so a deliberate logout or a later visit shows nothing.
+  const [signedOutNotice] = useState(() => takeSignOutReason() === 'inactivity')
 
   const busy = status === STATUS.SUBMITTING || status === STATUS.SUCCESS
 
@@ -87,6 +90,18 @@ export default function LoginPage() {
           <div className="mb-6 flex justify-center">
             <Badge status={status} />
           </div>
+
+          {signedOutNotice && (
+            <div
+              role="status"
+              className="mb-4 rounded-xl border border-purple-light bg-white px-4 py-3 text-center"
+            >
+              <p className="text-base font-bold text-content">Signed out for your security</p>
+              <p className="mt-1 text-sm text-content-muted">
+                Your session ended after 30 minutes of inactivity. Please sign in again.
+              </p>
+            </div>
+          )}
 
           <form
             onSubmit={handleSubmit}

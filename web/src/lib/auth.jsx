@@ -11,9 +11,86 @@ const AuthContext = createContext({
   profileError: null,
 })
 
+const IDLE_LIMIT_MS = 30 * 60 * 1000
+const LAST_ACTIVE_KEY = 'mtc.lastActiveAt'
+const SIGN_OUT_REASON_KEY = 'mtc.signedOutReason'
+
+/**
+ * Reads and clears the reason for the last automatic sign-out, so the login
+ * page can explain what happened. Read-once: a stale notice on a later visit
+ * would be confusing. Signing out via the Logout button sets nothing, so no
+ * message appears for a deliberate sign-out.
+ */
+export function takeSignOutReason() {
+  try {
+    const reason = localStorage.getItem(SIGN_OUT_REASON_KEY)
+    if (reason) localStorage.removeItem(SIGN_OUT_REASON_KEY)
+    return reason
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Signs the user out after 30 minutes without interaction.
+ *
+ * The timestamp lives in localStorage rather than a ref so the clock keeps
+ * running while the tab is closed - otherwise reopening the app would reset
+ * it and the session would effectively never expire. It is also shared across
+ * tabs, so activity in one keeps the others alive.
+ */
+function useIdleSignOut(active, onExpire) {
+  useEffect(() => {
+    if (!active) return undefined
+
+    const read = () => Number(localStorage.getItem(LAST_ACTIVE_KEY)) || Date.now()
+    const touch = () => {
+      try {
+        localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
+      } catch {
+        /* private mode - fall back to never expiring rather than breaking */
+      }
+    }
+    const expire = () => {
+      try {
+        localStorage.removeItem(LAST_ACTIVE_KEY)
+        localStorage.setItem(SIGN_OUT_REASON_KEY, 'inactivity')
+      } catch {
+        /* ignore */
+      }
+      onExpire()
+      supabase.auth.signOut()
+    }
+
+    // The session restored from a previous visit may already be stale - this
+    // is the "closed the tab and came back tomorrow" case.
+    if (Date.now() - read() > IDLE_LIMIT_MS) {
+      expire()
+      return undefined
+    }
+    touch()
+
+    const events = ['pointerdown', 'keydown', 'scroll', 'touchstart', 'focus']
+    events.forEach((e) => window.addEventListener(e, touch, { passive: true }))
+
+    const timer = setInterval(() => {
+      if (Date.now() - read() > IDLE_LIMIT_MS) expire()
+    }, 30_000)
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, touch))
+      clearInterval(timer)
+    }
+  }, [active, onExpire])
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [sessionLoading, setSessionLoading] = useState(true)
+  // True from the moment a session is judged stale until Supabase has
+  // actually cleared it. Counted as loading so the app never renders for a
+  // session that is on its way out.
+  const [expiring, setExpiring] = useState(false)
 
   // Role + grants, fetched rather than read from the token: admins edit them at runtime.
   const [profile, setProfile] = useState(null)
@@ -27,11 +104,15 @@ export function AuthProvider({ children }) {
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next ?? null)
+      if (next) setExpiring(false)
     })
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  const userId = session?.user?.id
+  const handleExpire = useCallback(() => setExpiring(true), [])
+  useIdleSignOut(Boolean(session), handleExpire)
+
+  const userId = expiring ? undefined : session?.user?.id
 
   useEffect(() => {
     if (!userId) {
@@ -55,6 +136,11 @@ export function AuthProvider({ children }) {
       cancelled = true
     }
   }, [userId])
+
+  // Signed in, but the profile fetch has not started yet - the effect above
+  // runs after this render. Without counting that as loading, callers briefly
+  // see a session with no grants and route as if the user had none.
+  const profilePending = Boolean(userId) && !profile && !profileError
 
   const isAdmin = profile?.role === 'admin'
 
@@ -86,9 +172,9 @@ export function AuthProvider({ children }) {
       hasModule,
       canEdit,
       profileError,
-      loading: sessionLoading || profileLoading,
+      loading: sessionLoading || profileLoading || profilePending || (expiring && Boolean(session)),
     }),
-    [session, profile, isAdmin, hasModule, canEdit, profileError, sessionLoading, profileLoading],
+    [session, profile, isAdmin, hasModule, canEdit, profileError, sessionLoading, profileLoading, profilePending, expiring],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

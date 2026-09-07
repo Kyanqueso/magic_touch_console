@@ -46,6 +46,7 @@ export default function DocumentListTab({
   deleteDoc,
   onSubmit,
   alertNoun,
+  printDoc,
 }) {
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -134,8 +135,18 @@ export default function DocumentListTab({
     reload()
   }
 
+  async function print(doc) {
+    if (!printDoc) return
+    try {
+      await printDoc(doc)
+    } catch (e) {
+      setAlert({ variant: 'danger', title: 'Could not print', message: errMessage(e) })
+    }
+  }
+
   const actions = (doc) => ({
     tab,
+    onPrint: printDoc ? () => print(doc) : undefined,
     onEdit: () => setEditTarget(doc),
     onArchive: () => setPending({ action: 'archive', items: [{ id: doc.id, primary: title(doc) }] }),
     onRestore: () => setPending({ action: 'restore', items: [{ id: doc.id, primary: title(doc) }] }),
@@ -328,13 +339,15 @@ export default function DocumentListTab({
   )
 }
 
-function DocActions({ tab, onEdit, onArchive, onRestore, onDelete }) {
+function DocActions({ tab, onPrint, onEdit, onArchive, onRestore, onDelete }) {
   return (
     <div className="inline-flex gap-2">
       <button
         type="button"
+        onClick={onPrint}
+        disabled={!onPrint}
         aria-label="Print"
-        className="rounded-md bg-component-bg p-1.5 text-content-muted transition-colors hover:bg-purple-light"
+        className="rounded-md bg-component-bg p-1.5 text-content-muted transition-colors hover:bg-purple-light disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Printer className="h-4 w-4" />
       </button>

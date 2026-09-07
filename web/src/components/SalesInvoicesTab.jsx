@@ -3,6 +3,7 @@ import DocumentListTab from './DocumentListTab.jsx'
 import AddSalesInvoiceModal from './AddSalesInvoiceModal.jsx'
 import { LineItems, DebitCredit } from './DocLineItems.jsx'
 import { peso, formatDate } from '../lib/format.js'
+import { printDocument } from '../lib/print.js'
 import {
   listPurchaseOrders,
   listSalesInvoices,
@@ -29,6 +30,23 @@ export default function SalesInvoicesTab({ supplier, profileId }) {
       cancelled = true
     }
   }, [profileId, sid])
+
+  // Line items live on the full document, not the list row.
+  async function printInvoice(row) {
+    const doc = await getSalesInvoice(profileId, sid, row.id)
+    printDocument({
+      docTitle: 'SALES INVOICE',
+      number: doc.invoiceNumber,
+      meta: [
+        ['Supplier', supplier.name],
+        ['Invoice Date', formatDate(doc.invoiceDate)],
+        ['Purchase Order', doc.poNumber],
+      ],
+      items: doc.items,
+      total: doc.total,
+      signatures: [['Received by', ''], ['Authorised by', '']],
+    })
+  }
 
   async function onSubmit(values, editTarget) {
     if (editTarget) {
@@ -64,6 +82,7 @@ export default function SalesInvoicesTab({ supplier, profileId }) {
       restoreDoc={(id) => restoreSalesInvoice(profileId, sid, id)}
       deleteDoc={(id) => deleteSalesInvoice(profileId, sid, id)}
       onSubmit={onSubmit}
+      printDoc={printInvoice}
       renderAddModal={(props) => <AddSalesInvoiceModal {...props} poOptions={poOptions} />}
     />
   )

@@ -45,6 +45,7 @@ Parameters:
 Conditions:
   # The property must be absent, not 0 - 0 means "throttle to zero invocations".
   ReserveConcurrency: !Not [!Equals [!Ref ReservedConcurrency, 0]]
+  PublicUrl: !Equals [!Ref FunctionUrlAuthType, 'NONE']
 
 Resources:
   ConsoleApi:
@@ -78,6 +79,39 @@ Resources:
         AuthType: !Ref FunctionUrlAuthType
         # No Cors block: Quarkus already sends those headers, and duplicates
         # make browsers reject the response.
+
+  # AuthType NONE is not enough on its own: the function also needs a resource
+  # policy granting public invoke. SAM writes one automatically only when it
+  # CREATES a URL as NONE - this one was created as AWS_IAM and updated later,
+  # so it is declared by hand here.
+  #
+  # BOTH statements are required. Since October 2025 Lambda checks
+  # lambda:InvokeFunction as well as lambda:InvokeFunctionUrl, and grants only
+  # one of them still returns 403 - from AWS, before the request reaches the
+  # application, and with no CORS headers, so the browser reports it as a CORS
+  # failure.
+  ConsoleApiPublicInvokeUrl:
+    Type: AWS::Lambda::Permission
+    Condition: PublicUrl
+    Properties:
+      FunctionName: !Ref ConsoleApi
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+  # InvokedViaFunctionUrl, not FunctionUrlAuthType: Lambda rejects the latter
+  # on this action ("FunctionUrlAuthType is only supported for
+  # lambda:InvokeFunctionUrl action"). It is also what keeps this from being a
+  # blanket public invoke - it restricts the grant to calls that arrive
+  # through the function URL.
+  ConsoleApiPublicInvokeFunction:
+    Type: AWS::Lambda::Permission
+    Condition: PublicUrl
+    Properties:
+      FunctionName: !Ref ConsoleApi
+      Action: lambda:InvokeFunction
+      Principal: '*'
+      InvokedViaFunctionUrl: true
 
   ConsoleApiLogGroup:
     Type: AWS::Logs::LogGroup

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ChevronDown, ChevronRight, Info, Loader2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, Info, Loader2, Printer } from 'lucide-react'
+import Button from './Button.jsx'
 import Select from './Select.jsx'
 import EmptyState from './EmptyState.jsx'
 import Pagination from './Pagination.jsx'
 import { formatDate } from '../lib/format.js'
+import { printDocument } from '../lib/print.js'
 import { listJobOrders, getJobOrder } from '../api/jobOrders.js'
 
 const DETAIL_COLUMNS = [
@@ -91,6 +93,39 @@ export default function JobOrderSummary({ profileId, customerId, customerName, d
     return [...seen.values()].map((m, i) => ({ ...m, no: `Material ${i + 1}` }))
   }, [matching])
 
+  // Prints every matching job order, not just the page on screen - a summary
+  // split across pages is not much of a summary.
+  function printSummary() {
+    printDocument({
+      docTitle: 'JOB ORDER SUMMARY',
+      number: jobTitle,
+      meta: [
+        ['Customer', customerName],
+        ['Job Title', jobTitle],
+        ['Specifications', representative?.specification],
+        ['Size', representative?.size],
+        ['Job Orders', String(matching.length)],
+      ],
+      tables: [
+        ...(materials.length
+          ? [
+              {
+                caption: 'Materials',
+                headers: MATERIAL_COLUMNS.map(([, label]) => label),
+                rows: materials.map((m) => MATERIAL_COLUMNS.map(([key]) => m[key])),
+              },
+            ]
+          : []),
+        {
+          caption: 'Details',
+          headers: DETAIL_COLUMNS.map(([, label]) => label),
+          rows: matching.map((r) => DETAIL_COLUMNS.map(([key, , type]) => fmt(r[key], type))),
+        },
+      ],
+      landscape: true,
+    })
+  }
+
   const total = matching.length
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const safePage = Math.min(page, pageCount)
@@ -107,10 +142,16 @@ export default function JobOrderSummary({ profileId, customerId, customerName, d
         >
           <ArrowLeft className="h-6 w-6" />
         </button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-extrabold text-content">Job Order Summary</h1>
           <p className="text-sm text-content-muted">{customerName}</p>
         </div>
+        {matching.length > 0 && (
+          <Button variant="secondary" size="sm" onClick={printSummary}>
+            <Printer className="h-4 w-4" />
+            Print
+          </Button>
+        )}
       </div>
 
       {loading ? (

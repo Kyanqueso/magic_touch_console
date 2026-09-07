@@ -19,6 +19,7 @@ import AddPurchaseOrderModal from './AddPurchaseOrderModal.jsx'
 import { LineItems } from './DocLineItems.jsx'
 import useAutoAlert from '../hooks/useAutoAlert.js'
 import { peso, formatDate } from '../lib/format.js'
+import { printDocument } from '../lib/print.js'
 import { listMaterials } from '../api/materials.js'
 import {
   listPurchaseOrders,
@@ -143,6 +144,30 @@ export default function PurchaseOrdersTab({ supplier, profileId }) {
     }
   }
 
+  // The list row carries only a count and a total, so fetch the full document
+  // for its line items before printing.
+  async function printPo(poRow) {
+    try {
+      const po = await getPurchaseOrder(profileId, sid, poRow.id)
+      printDocument({
+        docTitle: 'PURCHASE ORDER',
+        number: po.poNumber,
+        meta: [
+          ['Supplier', supplier.name],
+          ['PO Date', formatDate(po.dateOrdered)],
+        ],
+        items: po.items,
+        total: po.total,
+        signatures: [
+          ['Prepared by', po.preparedBy],
+          ['Approved by', po.approvedBy],
+        ],
+      })
+    } catch (e) {
+      setAlert({ variant: 'danger', title: 'Could not print', message: errMessage(e) })
+    }
+  }
+
   async function handleSubmit(values) {
     try {
       if (editTarget) {
@@ -256,6 +281,7 @@ export default function PurchaseOrdersTab({ supplier, profileId }) {
                       <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                         <PoActions
                           tab={tab}
+                          onPrint={() => printPo(po)}
                           onEdit={() => openEdit(po)}
                           onArchive={() => setPending({ action: 'archive', items: [toItem(po)] })}
                           onRestore={() => setPending({ action: 'restore', items: [toItem(po)] })}
@@ -338,11 +364,12 @@ function PoExpanded({ pid, sid, id }) {
   )
 }
 
-function PoActions({ tab, onEdit, onArchive, onRestore, onDelete }) {
+function PoActions({ tab, onPrint, onEdit, onArchive, onRestore, onDelete }) {
   return (
     <div className="inline-flex gap-2">
       <button
         type="button"
+        onClick={onPrint}
         aria-label="Print"
         className="rounded-md bg-component-bg p-1.5 text-content-muted transition-colors hover:bg-purple-light"
       >

@@ -12,6 +12,7 @@ import {
   LockOpen,
   Pencil,
   Plus,
+  Printer,
   RotateCcw,
   Save,
   Trash2,
@@ -24,6 +25,7 @@ import NoteField from './NoteField.jsx'
 import ConfirmDialog from './ConfirmDialog.jsx'
 import JobOrderSummary from './JobOrderSummary.jsx'
 import { peso, formatDate } from '../lib/format.js'
+import { printDocument } from '../lib/print.js'
 import { blankMaterial, saveJobOrderDraft } from '../api/jobOrders.js'
 
 const BRANCHES = ['Main Branch', 'Lapuz', 'Mandurriao', 'Jaro', 'Molo']
@@ -96,6 +98,7 @@ export default function JobOrderDetail({
   const closed = job.status === 'Closed'
 
   const [showSummary, setShowSummary] = useState(false)
+
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [draft, setDraft] = useState(job)
@@ -202,6 +205,43 @@ export default function JobOrderDetail({
 
   const allExpanded = materials.length > 0 && materials.every((m) => expanded.has(m.id))
 
+  // Prints the saved job, not the edit draft - the button only shows when not
+  // editing, so what is on screen is what gets printed.
+  function printJob() {
+    const mats = (job.materials || []).filter((m) => m.material)
+    printDocument({
+      docTitle: 'JOB ORDER',
+      number: `Job No. ${job.id}`,
+      meta: [
+        ['Customer', job.customerName],
+        ['Status', job.status],
+        ...OVERVIEW.map(([k, label]) => [label, job[k]]),
+        ...ORDER.map(([k, label, type]) => [label, display(job[k], type)]),
+        ...PRICING.map(([k, label, type]) => [label, display(job[k], type)]),
+        ['Operator', job.operator],
+        ['Collate', job.collate],
+      ],
+      tables: mats.length
+        ? [
+            {
+              caption: 'Materials',
+              headers: ['#', 'Material', ...MAT_FIELDS.map(([, label]) => label), 'Size', 'Qty'],
+              rows: mats.map((m, i) => [
+                i + 1,
+                m.material,
+                ...MAT_FIELDS.map(([k]) => m[k]),
+                m.sizeNeeded,
+                m.qtyNeeded,
+              ]),
+            },
+          ]
+        : [],
+      extras: job.otherInstructions ? [['Other Instructions', job.otherInstructions]] : [],
+      signatures: [['Prepared by', ''], ['Approved by', ''], ['Received by', '']],
+      landscape: true,
+    })
+  }
+
   if (showSummary) {
     return (
       <JobOrderSummary
@@ -265,6 +305,10 @@ export default function JobOrderDetail({
             </>
           ) : (
             <>
+              <Button variant="secondary" size="sm" onClick={printJob}>
+                <Printer className="h-4 w-4" />
+                Print
+              </Button>
               <Button variant="secondary" size="sm" onClick={() => setShowSummary(true)}>
                 <BarChart3 className="h-4 w-4" />
                 View Summary

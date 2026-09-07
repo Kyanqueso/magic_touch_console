@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import DocumentListTab from './DocumentListTab.jsx'
 import AddVoucherModal from './AddVoucherModal.jsx'
 import { peso, formatDate } from '../lib/format.js'
+import { printDocument } from '../lib/print.js'
 import {
   listSalesInvoices,
   listVouchers,
@@ -32,6 +33,22 @@ export default function VouchersTab({ supplier, profileId }) {
       cancelled = true
     }
   }, [profileId, sid])
+
+  // A voucher has no line items, so the list row already holds everything.
+  function printVoucher(d) {
+    printDocument({
+      docTitle: 'VOUCHER',
+      number: d.voucherNumber,
+      meta: [
+        ['Supplier', supplier.name],
+        ['Voucher Date', formatDate(d.date)],
+        ['Sales Invoice', d.sInvNumber],
+        ['Status', d.paid ? 'Paid' : 'Unpaid'],
+      ],
+      extras: [['Net Amount', peso(d.netAmount)]],
+      signatures: [['Prepared by', ''], ['Approved by', ''], ['Received by', '']],
+    })
+  }
 
   async function onSubmit(values, editTarget) {
     // netAmount defaults to the linked sales-invoice total
@@ -92,6 +109,7 @@ export default function VouchersTab({ supplier, profileId }) {
       restoreDoc={(id) => restoreVoucher(profileId, sid, id)}
       deleteDoc={(id) => deleteVoucher(profileId, sid, id)}
       onSubmit={onSubmit}
+      printDoc={printVoucher}
       renderAddModal={(props) => <AddVoucherModal {...props} sinvOptions={sinvOptions} />}
     />
   )
