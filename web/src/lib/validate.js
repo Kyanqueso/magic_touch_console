@@ -47,7 +47,7 @@ function clean(errors) {
   return Object.fromEntries(Object.entries(errors).filter(([, v]) => v))
 }
 
-const TIN_RE = /^\d{3}-\d{3}-\d{3}-\d{3}$/
+const TIN_RE = /^\d{3}-\d{3}-\d{3}-\d{5}$/
 
 /** Delivery must not precede the order date — the API rejects it outright. */
 export function deliveryDateError(dateOrdered, deliveryDate) {
@@ -113,7 +113,7 @@ export function validatePartyRow(row) {
       /^\d{1,20}$/.test(text(row.zip)) ? '' : 'Digits only.',
     ),
     terms: termsError(row.terms),
-    tin: optional(row.tin, () => (TIN_RE.test(text(row.tin)) ? '' : 'Must look like 000-000-000-000.')),
+    tin: optional(row.tin, () => (TIN_RE.test(text(row.tin)) ? '' : 'Must look like 000-000-000-00000.')),
     branchCode: tooLong(row.branchCode, 10),
     companyType: optional(row.companyType, () => oneOf(row.companyType, COMPANY_TYPES, 'Company Type')),
     taxType: optional(row.taxType, () => oneOf(row.taxType, TAX_TYPES, 'Tax Type')),

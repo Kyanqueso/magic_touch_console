@@ -21,7 +21,7 @@ import java.util.List;
 public record CorporateProfileRequest(
         @NotBlank @Size(max = 200) String name,
         @Size(max = 4000) String address,
-        @Pattern(regexp = Patterns.TIN, message = "Must look like 000-000-000-000.") String tin,
+        @Pattern(regexp = Patterns.TIN, message = "Must look like 000-000-000-00000.") String tin,
         @Pattern(regexp = Patterns.SSS, message = "Must look like 00-0000000-0.") String sss,
         @Pattern(regexp = Patterns.PHIC, message = "Must look like 00-000000000-0.") String phic,
         @Pattern(regexp = Patterns.HDMF, message = "Must look like 0000-0000-0000.") String hdmf,

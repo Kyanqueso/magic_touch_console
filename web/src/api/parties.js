@@ -13,7 +13,7 @@ const COMMON_COLUMNS = [
   {
     key: 'tin',
     label: 'TIN',
-    edit: { mask: maskTIN, inputMode: 'numeric', placeholder: '000-000-000-000' },
+    edit: { mask: maskTIN, inputMode: 'numeric', placeholder: '000-000-000-00000' },
   },
   { key: 'branchCode', label: 'Branch Code' },
   { key: 'companyType', label: 'Company Type', edit: { select: COMPANY_TYPES } },

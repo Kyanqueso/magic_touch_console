@@ -38,7 +38,7 @@ class CustomerResourceTest extends AuthenticatedApiTest {
                       "scope": "GLOBAL",
                       "name": "Sunrise Trading Co.",
                       "termsDays": 30,
-                      "tin": "118-902-334-000"
+                      "tin": "118-902-334-00000"
                     }
                     """)
                 .when().post(base)
@@ -75,11 +75,11 @@ class CustomerResourceTest extends AuthenticatedApiTest {
     @Test
     void rejectsADuplicateTin() {
         given().contentType("application/json")
-                .body("{ \"scope\": \"GLOBAL\", \"name\": \"First TIN Co.\", \"tin\": \"111-222-333-000\" }")
+                .body("{ \"scope\": \"GLOBAL\", \"name\": \"First TIN Co.\", \"tin\": \"111-222-333-00000\" }")
                 .when().post(base).then().statusCode(201);
 
         given().contentType("application/json")
-                .body("{ \"scope\": \"GLOBAL\", \"name\": \"Second TIN Co.\", \"tin\": \"111-222-333-000\" }")
+                .body("{ \"scope\": \"GLOBAL\", \"name\": \"Second TIN Co.\", \"tin\": \"111-222-333-00000\" }")
                 .when().post(base)
                 .then().statusCode(400)
                 .body("error.fields.tin", notNullValue());

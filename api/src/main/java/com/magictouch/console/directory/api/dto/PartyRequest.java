@@ -23,7 +23,7 @@ public record PartyRequest(
         @Size(max = 4000) String address,
         @Size(max = 20) String zipCode,
         @PositiveOrZero @Max(365) Integer termsDays,
-        @Pattern(regexp = Patterns.TIN, message = "Must look like 000-000-000-000.") String tin,
+        @Pattern(regexp = Patterns.TIN, message = "Must look like 000-000-000-00000.") String tin,
         @Size(max = 10) String branchCode,
         CompanyType companyType,
         TaxType taxType,

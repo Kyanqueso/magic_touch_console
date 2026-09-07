@@ -38,7 +38,7 @@ class CorporateProfileResourceTest extends AuthenticatedApiTest {
                     {
                       "name": "Northgate Trading Corporation",
                       "address": "Makati City",
-                      "tin": "123-456-789-000",
+                      "tin": "123-456-789-00000",
                       "wtaxAtc1": "WI010",
                       "wtaxAtc1Rate": 10.00,
                       "registrations": [
@@ -51,7 +51,7 @@ class CorporateProfileResourceTest extends AuthenticatedApiTest {
                 .when().put(location)
                 .then().statusCode(200)
                 .body("status", is("COMPLETE"))
-                .body("tin", is("123-456-789-000"))
+                .body("tin", is("123-456-789-00000"))
                 .body("registrations", hasSize(2))
                 .body("registrations.find { it.body == 'DTI' }.active", is(true))
                 .body("registrations.find { it.body == 'SEC' }.active", is(false))
@@ -63,7 +63,7 @@ class CorporateProfileResourceTest extends AuthenticatedApiTest {
                 .body("""
                     {
                       "name": "Northgate Trading Corporation",
-                      "tin": "123-456-789-000",
+                      "tin": "123-456-789-00000",
                       "registrations": [
                         { "body": "DTI", "registrationNo": "2356744235" }
                       ],
@@ -82,7 +82,7 @@ class CorporateProfileResourceTest extends AuthenticatedApiTest {
                 .body("""
                     {
                       "name": "Northgate Trading Corporation",
-                      "tin": "123-456-789-000",
+                      "tin": "123-456-789-00000",
                       "filingTypes": ["1601C", "1601C"]
                     }
                     """)
@@ -248,11 +248,11 @@ class CorporateProfileResourceTest extends AuthenticatedApiTest {
     @Test
     void rejectsDuplicateGovernmentId() {
         given().contentType("application/json")
-                .body("{ \"name\": \"First TIN Corp.\", \"tin\": \"321-654-987-000\" }")
+                .body("{ \"name\": \"First TIN Corp.\", \"tin\": \"321-654-987-00000\" }")
                 .when().post(BASE).then().statusCode(201);
 
         given().contentType("application/json")
-                .body("{ \"name\": \"Second TIN Corp.\", \"tin\": \"321-654-987-000\" }")
+                .body("{ \"name\": \"Second TIN Corp.\", \"tin\": \"321-654-987-00000\" }")
                 .when().post(BASE)
                 .then().statusCode(400)
                 .body("error.fields.tin", notNullValue());

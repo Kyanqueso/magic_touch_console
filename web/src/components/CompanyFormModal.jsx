@@ -72,8 +72,8 @@ export default function CompanyFormModal({
     e.preventDefault()
     const errs = {}
     if (!form.name.trim()) errs.name = 'Required.'
-    if (form.tin && !/^\d{3}-\d{3}-\d{3}-\d{3}$/.test(form.tin)) {
-      errs.tin = 'Must look like 000-000-000-000.'
+    if (form.tin && !/^\d{3}-\d{3}-\d{3}-\d{5}$/.test(form.tin)) {
+      errs.tin = 'Must look like 000-000-000-00000.'
     }
     if (Object.keys(errs).length) {
       setErrors(errs)
@@ -116,7 +116,7 @@ export default function CompanyFormModal({
         <TextField
           label="TIN"
           inputMode="numeric"
-          placeholder="000-000-000-000"
+          placeholder="000-000-000-00000"
           value={form.tin}
           onChange={(e) => set('tin', maskTIN(e.target.value))}
           error={errors.tin}

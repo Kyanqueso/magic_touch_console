@@ -30,7 +30,7 @@ function groupDigits(input, sizes) {
   return parts.join('-')
 }
 
-export const maskTIN = (s) => groupDigits(s, [3, 3, 3, 3]) // 000-000-000-000
+export const maskTIN = (s) => groupDigits(s, [3, 3, 3, 5]) // 000-000-000-00000
 export const maskSSS = (s) => groupDigits(s, [2, 7, 1]) //     00-0000000-0
 export const maskPHIC = (s) => groupDigits(s, [2, 9, 1]) //    00-000000000-0
 export const maskHDMF = (s) => groupDigits(s, [4, 4, 4]) //    0000-0000-0000

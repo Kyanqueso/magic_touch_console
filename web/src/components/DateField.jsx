@@ -12,10 +12,17 @@ const SIZES = { md: 'py-3 text-base', sm: 'py-2 text-sm' }
 const PANEL_W = 288 // w-72
 const PANEL_H = 340
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+const MONTHS_SHORT = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
+
+// Year choices for the header dropdown: a wide window around now so reaching a
+// birth year or a far-off expiry is one click, not dozens of month steps.
+const THIS_YEAR = new Date().getFullYear()
+const YEAR_MIN = THIS_YEAR - 100
+const YEAR_MAX = THIS_YEAR + 15
+const YEARS = Array.from({ length: YEAR_MAX - YEAR_MIN + 1 }, (_, i) => YEAR_MAX - i)
 
 const pad = (n) => String(n).padStart(2, '0')
 const toISO = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`
@@ -153,23 +160,40 @@ export default function DateField({
             style={{ left: pos.left, top: pos.top, bottom: pos.bottom }}
             className="animate-dropdown fixed z-[60] w-72 rounded-lg border border-purple-light bg-white p-3 shadow-lg"
           >
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-2 flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => step(-1)}
                 aria-label="Previous month"
-                className="rounded-md p-1 text-content-muted transition-colors hover:bg-component-bg"
+                className="shrink-0 rounded-md p-1 text-content-muted transition-colors hover:bg-component-bg"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="text-sm font-bold text-content">
-                {MONTHS[view.m]} {view.y}
-              </span>
+              <select
+                aria-label="Month"
+                value={view.m}
+                onChange={(e) => setView((v) => ({ ...v, m: Number(e.target.value) }))}
+                className="min-w-0 flex-1 rounded-md border border-purple-light bg-white px-1 py-1 text-sm font-bold text-content outline-none focus:border-purple"
+              >
+                {MONTHS_SHORT.map((mo, i) => (
+                  <option key={mo} value={i}>{mo}</option>
+                ))}
+              </select>
+              <select
+                aria-label="Year"
+                value={view.y}
+                onChange={(e) => setView((v) => ({ ...v, y: Number(e.target.value) }))}
+                className="shrink-0 rounded-md border border-purple-light bg-white px-1 py-1 text-sm font-bold text-content outline-none focus:border-purple"
+              >
+                {(YEARS.includes(view.y) ? YEARS : [view.y, ...YEARS]).map((yr) => (
+                  <option key={yr} value={yr}>{yr}</option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={() => step(1)}
                 aria-label="Next month"
-                className="rounded-md p-1 text-content-muted transition-colors hover:bg-component-bg"
+                className="shrink-0 rounded-md p-1 text-content-muted transition-colors hover:bg-component-bg"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>

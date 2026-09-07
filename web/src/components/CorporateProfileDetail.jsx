@@ -29,14 +29,14 @@ const opts = (list) => list.map((o) => ({ value: o, label: o }))
 
 // tin/sss/phic/hdmf are required; DTI/SEC are optional but format-checked when filled.
 const REQUIRED_RULES = {
-  tin: [/^\d{3}-\d{3}-\d{3}-\d{3}$/, 'Invalid TIN.'],
+  tin: [/^\d{3}-\d{3}-\d{3}-\d{5}$/, 'Invalid TIN.'],
   sss: [/^\d{2}-\d{7}-\d$/, 'Invalid SSS.'],
   phic: [/^\d{2}-\d{9}-\d$/, 'Invalid PHIC.'],
   hdmf: [/^\d{4}-\d{4}-\d{4}$/, 'Invalid HDMF.'],
 }
 const OPTIONAL_RULES = {
   dtiNo: [/^\d{6,}$/, 'Invalid DTI No.'],
-  secNo: [/^[A-Za-z]{2}\d{6,}$/, 'Invalid SEC No.'],
+  secNo: [/^[A-Za-z0-9]+$/, 'SEC No. must be letters and numbers only.'],
 }
 
 const EMPTY_DETAILS = {
