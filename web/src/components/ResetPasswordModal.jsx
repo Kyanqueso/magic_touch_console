@@ -37,16 +37,21 @@ async function resetPassword(_email, _code, password, confirm) {
 
 const STEPS = { EMAIL: 'email', OTP: 'otp', PASSWORD: 'password', DONE: 'done' }
 
+// The email step stays deliberately non-committal: Supabase does not reveal
+// whether an address has an account, and neither should we.
 const CONTEXT_ALERT = {
   [STEPS.OTP]: {
-    title: 'Valid Email!',
-    body: 'Please enter the OTP you have received in that email.',
+    variant: 'neutral',
+    title: 'Check your email',
+    body: 'If an account exists for that address, a code is on its way. It can take a minute — check your spam folder too. Enter it below once you have it.',
   },
   [STEPS.PASSWORD]: {
+    variant: 'success',
     title: 'Valid OTP!',
     body: 'Please set your new password.',
   },
   [STEPS.DONE]: {
+    variant: 'success',
     title: 'Password Set!',
     body: 'You may now login with your new password.',
   },
@@ -134,7 +139,7 @@ export default function ResetPasswordModal({ open, onClose }) {
         context &&
         !alertDismissed && (
           <Alert
-            variant="success"
+            variant={context.variant}
             title={context.title}
             onDismiss={() => setAlertDismissed(true)}
           >
@@ -153,7 +158,7 @@ export default function ResetPasswordModal({ open, onClose }) {
             <>
               <div className="space-y-2">
                 <p className="text-base text-black">
-                  Enter your email to receive a reset OTP.
+                  Enter your email to request a reset code.
                 </p>
                 <TextField
                   name="email"
