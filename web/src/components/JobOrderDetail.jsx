@@ -27,6 +27,8 @@ import JobOrderSummary from './JobOrderSummary.jsx'
 import LeaveEditDialog from './LeaveEditDialog.jsx'
 import { FieldError } from './EditableCell.jsx'
 import { validateJobOrderDetail } from '../lib/validate.js'
+import { useUnsavedChanges } from '../lib/unsavedChanges.jsx'
+import { maskDigits } from '../lib/masks.js'
 import { peso, formatDate } from '../lib/format.js'
 import { printDocument } from '../lib/print.js'
 import { blankMaterial, saveJobOrderDraft } from '../api/jobOrders.js'
@@ -46,8 +48,9 @@ const OVERVIEW = [
   ['jobDescription', 'Job Description', 'text'],
   ['specification', 'Specifications', 'text'],
   ['branch', 'Branch', 'combo', BRANCHES],
-  ['seriesFrom', 'Series From', 'text'],
-  ['seriesTo', 'Series To', 'text'],
+  // Digits only, matching the Add Job Order form — leading zeros are kept.
+  ['seriesFrom', 'Series From', 'digits'],
+  ['seriesTo', 'Series To', 'digits'],
   ['equipment', 'Equipment', 'select', EQUIPMENT],
 ]
 const ORDER = [
@@ -175,9 +178,11 @@ export default function JobOrderDetail({
     }
   }
 
-  // Leaving mid-edit throws the draft away, so ask first.
+  // Leaving mid-edit throws the draft away, so ask first — locally for the
+  // back button, and through the shared guard for the header and section nav.
   const [leaveTo, setLeaveTo] = useState(null)
   const dirty = editing && history.length > 0
+  useUnsavedChanges(dirty, exitEdit)
   function guard(action) {
     if (dirty) setLeaveTo(() => action)
     else action()
@@ -703,7 +708,8 @@ function FieldInput({ type, value, options, error, onChange }) {
     <input
       type="text"
       value={value ?? ''}
-      onChange={(e) => onChange(e.target.value)}
+      inputMode={type === 'digits' ? 'numeric' : undefined}
+      onChange={(e) => onChange(type === 'digits' ? maskDigits(e.target.value) : e.target.value)}
       aria-invalid={error ? true : undefined}
       className={cls}
     />

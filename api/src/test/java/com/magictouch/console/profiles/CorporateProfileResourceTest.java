@@ -115,6 +115,41 @@ class CorporateProfileResourceTest extends AuthenticatedApiTest {
         org.junit.jupiter.api.Assertions.assertEquals(customersBefore + 1, after.getLong("customerCount"));
     }
 
+    /** A profile with no Local rows of its own still counts the shared Global ones. */
+    @Test
+    void listCountsGlobalCustomersAndSuppliersForEveryProfile() {
+        String loc = given().contentType("application/json")
+                .body("{ \"name\": \"Globals Only Corp.\" }")
+                .when().post(BASE).then().statusCode(201).extract().header("Location");
+        long profileId = Long.parseLong(loc.substring(loc.lastIndexOf('/') + 1));
+
+        var before = countsFor("Globals Only Corp.");
+        long customersBefore = before.getLong("customerCount");
+        long suppliersBefore = before.getLong("supplierCount");
+
+        // Added on another profile as Global, so this one sees them too.
+        given().contentType("application/json")
+                .body("{ \"scope\": \"GLOBAL\", \"name\": \"Shared Customer\" }")
+                .when().post(BASE + "/" + profileId + "/customers").then().statusCode(201);
+        given().contentType("application/json")
+                .body("{ \"scope\": \"GLOBAL\", \"name\": \"Shared Supplier\" }")
+                .when().post(BASE + "/" + profileId + "/suppliers").then().statusCode(201);
+
+        var after = countsFor("Globals Only Corp.");
+        org.junit.jupiter.api.Assertions.assertEquals(customersBefore + 1, after.getLong("customerCount"));
+        org.junit.jupiter.api.Assertions.assertEquals(suppliersBefore + 1, after.getLong("supplierCount"));
+
+        // And a second, unrelated profile sees the same shared rows.
+        given().contentType("application/json")
+                .body("{ \"name\": \"Other Globals Corp.\" }")
+                .when().post(BASE).then().statusCode(201);
+        var other = countsFor("Other Globals Corp.");
+        org.junit.jupiter.api.Assertions.assertEquals(
+                after.getLong("customerCount"), other.getLong("customerCount"));
+        org.junit.jupiter.api.Assertions.assertEquals(
+                after.getLong("supplierCount"), other.getLong("supplierCount"));
+    }
+
     /** The card shows job orders when the module is on for the profile, suppliers when it is off. */
     @Test
     void listReportsSupplierCountAndWhetherJobOrdersAreOn() {

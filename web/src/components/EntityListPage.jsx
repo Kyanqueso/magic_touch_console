@@ -24,12 +24,13 @@ import Loading from './Loading.jsx'
 import CompanyFormModal from './CompanyFormModal.jsx'
 import ConfirmDialog from './ConfirmDialog.jsx'
 import ActionConfirmDialog, { actionAlert } from './ActionConfirmDialog.jsx'
-import EditableCell from './EditableCell.jsx'
+import CellEditor from './CellEditor.jsx'
 import EditBar from './EditBar.jsx'
 import LeaveEditDialog from './LeaveEditDialog.jsx'
 import useTableEdit from '../hooks/useTableEdit.js'
 import useAutoAlert from '../hooks/useAutoAlert.js'
 import { validatePartyRow } from '../lib/validate.js'
+import { useUnsavedChanges } from '../lib/unsavedChanges.jsx'
 import {
   listParties,
   createParty,
@@ -113,8 +114,10 @@ export default function EntityListPage({
     reload()
   }, validatePartyRow)
 
-  // Leaving mid-edit throws the draft away, so ask first.
+  // Leaving mid-edit throws the draft away, so ask first — locally for the
+  // tabs here, and through the shared guard for the header and section nav.
   const [leaveTo, setLeaveTo] = useState(null)
+  useUnsavedChanges(edit.dirty, edit.cancel)
   function guard(action) {
     if (edit.dirty) setLeaveTo(() => action)
     else action()
@@ -420,7 +423,8 @@ export default function EntityListPage({
                         }`}
                       >
                         {edit.editing && !READONLY_KEYS.has(c.key) ? (
-                          <EditableCell
+                          <CellEditor
+                            spec={c.edit}
                             value={r[c.key]}
                             error={edit.errorsFor(r.id)[c.key]}
                             onChange={(v) => edit.setCell(r.id, c.key, v)}

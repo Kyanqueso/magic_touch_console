@@ -25,6 +25,7 @@ import Loading from '../components/Loading.jsx'
 import EditableCell from '../components/EditableCell.jsx'
 import LeaveEditDialog from '../components/LeaveEditDialog.jsx'
 import { validateMaterialRow, validateRows, countErrors } from '../lib/validate.js'
+import { useUnsavedChanges } from '../lib/unsavedChanges.jsx'
 import useAutoAlert from '../hooks/useAutoAlert.js'
 import { peso } from '../lib/format.js'
 import {
@@ -197,7 +198,9 @@ export default function MaterialsPage() {
         return !was || Object.keys(r).some((k) => r[k] !== was[k])
       }))
 
-  // Leaving mid-edit throws the draft away, so ask first.
+  // Leaving mid-edit throws the draft away, so ask first — locally for the
+  // tabs here, and through the shared guard for the header nav.
+  useUnsavedChanges(dirty, exitEdit)
   function guard(action) {
     if (dirty) setLeaveTo(() => action)
     else action()

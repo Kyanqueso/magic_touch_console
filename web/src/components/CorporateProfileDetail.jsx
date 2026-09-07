@@ -6,7 +6,8 @@ import DateField from './DateField.jsx'
 import EntityListPage from './EntityListPage.jsx'
 import JobOrdersSection from './JobOrdersSection.jsx'
 import SupplierDetail from './SupplierDetail.jsx'
-import { COMPANY_TYPES, TAX_TYPES } from './CompanyFormModal.jsx'
+import { COMPANY_TYPES, TAX_TYPES } from '../lib/options.js'
+import { useNavigationGuard } from '../lib/unsavedChanges.jsx'
 import { formatDate } from '../lib/format.js'
 import { maskTIN, maskSSS, maskPHIC, maskHDMF } from '../lib/masks.js'
 import { CUSTOMER_COLUMNS, SUPPLIER_COLUMNS } from '../api/parties.js'
@@ -65,6 +66,7 @@ export default function CorporateProfileDetail({
   const filled = profile.status === 'Filled Up' && Boolean(profile.details)
   const [editing, setEditing] = useState(!filled)
   const [supplierDrill, setSupplierDrill] = useState(null)
+  const guard = useNavigationGuard()
 
   useEffect(() => {
     if (section !== 'suppliers') setSupplierDrill(null)
@@ -90,13 +92,15 @@ export default function CorporateProfileDetail({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={onExitSection}
+            onClick={() => guard(onExitSection)}
             aria-label="Back"
             className="rounded-md p-1 text-content transition-colors hover:bg-white"
           >
             <ArrowLeft className="h-6 w-6" />
           </button>
-          <h1 className="text-2xl font-extrabold text-content">{profile.name}</h1>
+          <h1 className="text-2xl font-extrabold text-content">
+            {profile.name} {isCustomers ? 'Customers' : 'Suppliers'}
+          </h1>
         </div>
         <div className="mt-6">
           <EntityListPage

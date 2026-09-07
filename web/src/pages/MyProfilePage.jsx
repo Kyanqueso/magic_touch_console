@@ -26,6 +26,7 @@ import AddUserModal from '../components/AddUserModal.jsx'
 import AccessToggle from '../components/AccessToggle.jsx'
 import useAutoAlert from '../hooks/useAutoAlert.js'
 import { useAuth } from '../lib/auth.jsx'
+import { useUnsavedChanges } from '../lib/unsavedChanges.jsx'
 import { maskPhone, sanitizeEmail } from '../lib/masks.js'
 import {
   listModules,
@@ -348,8 +349,10 @@ function UserAccessPanel({ userId, onBack, onSaved, onError }) {
     setHistory([])
   }
 
-  // Leaving mid-edit throws the draft away, so ask first.
+  // Leaving mid-edit throws the draft away, so ask first — locally for the
+  // back button, and through the shared guard for the header nav.
   const dirty = editing && history.length > 0
+  useUnsavedChanges(dirty, exitEdit)
   function guard(action) {
     if (dirty) setLeaveTo(() => action)
     else action()

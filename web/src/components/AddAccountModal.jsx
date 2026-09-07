@@ -7,8 +7,7 @@ import Select from './Select.jsx'
 import Combobox from './Combobox.jsx'
 import NumberField from './NumberField.jsx'
 import NoteField from './NoteField.jsx'
-
-const ACCOUNT_CLASSES = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense']
+import { ACCOUNT_CLASSES } from '../lib/options.js'
 
 const EMPTY = {
   category: '',

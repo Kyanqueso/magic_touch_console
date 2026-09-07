@@ -23,6 +23,9 @@ export default function Combobox({
 }) {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
+  // Until the user types, the list shows everything — opening a box that
+  // already holds a value should still offer the alternatives, not just itself.
+  const [typed, setTyped] = useState(false)
   const rootRef = useRef(null)
   const panelRef = useRef(null)
   const pos = usePopoverPosition(open, rootRef, { height: PANEL_H, matchWidth: true })
@@ -31,9 +34,9 @@ export default function Combobox({
 
   const filtered = useMemo(() => {
     const q = text.trim().toLowerCase()
-    if (!q) return options
+    if (!q || !typed) return options
     return options.filter((o) => o.toLowerCase().includes(q))
-  }, [options, text])
+  }, [options, text, typed])
 
   const isNew =
     text.trim().length > 0 &&
@@ -53,6 +56,7 @@ export default function Combobox({
     onChange(v)
     setOpen(false)
     setActive(-1)
+    setTyped(false)
   }
 
   function onKeyDown(e) {
@@ -94,8 +98,12 @@ export default function Combobox({
             onChange(e.target.value)
             setOpen(true)
             setActive(-1)
+            setTyped(true)
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            setOpen(true)
+            setTyped(false)
+          }}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
           aria-invalid={invalid || undefined}

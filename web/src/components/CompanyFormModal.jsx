@@ -7,21 +7,7 @@ import Select from './Select.jsx'
 import NoteField from './NoteField.jsx'
 import DiscardChangesDialog from './DiscardChangesDialog.jsx'
 import { maskTIN, maskZip } from '../lib/masks.js'
-
-export const TERMS = ['COD', '30', '60', '90']
-export const SCOPES = ['Local', 'Global']
-export const COMPANY_TYPES = ['Single', 'OPC', 'Partnership', 'Corporation']
-export const TAX_TYPES = ['VAT', 'Non-VAT', 'VAT Exempt', 'Zero Rated']
-export const WTAX_ATC = [
-  'WI011 (10%)',
-  'WI100 (5%)',
-  'WI157 (2%)',
-  'WI158 (1%)',
-  'WC100 (5%)',
-  'WC157 (2%)',
-  'WC158 (1%)',
-  'WC160 (2%)',
-]
+import { COMPANY_TYPES, SCOPES, TAX_TYPES, TERMS, WTAX_ATC } from '../lib/options.js'
 
 const EMPTY = {
   name: '',

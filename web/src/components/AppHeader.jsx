@@ -4,6 +4,7 @@ import { LogOut, Menu, X } from 'lucide-react'
 import ConfirmDialog from './ConfirmDialog.jsx'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../lib/auth.jsx'
+import { useNavigationGuard } from '../lib/unsavedChanges.jsx'
 
 // `moduleKey` matches modules.key and gates the item; My Profile has none.
 export const NAV_ITEMS = [
@@ -32,6 +33,14 @@ export default function AppHeader({ items, title }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { hasModule } = useAuth()
+  const guard = useNavigationGuard()
+
+  // Every link goes through the guard, so leaving a half-edited table asks first.
+  const go = (to) => (e) => {
+    e.preventDefault()
+    setOpen(false)
+    guard(() => navigate(to))
+  }
 
   const scoped = Array.isArray(items)
   // Hides dead links. Not security - the API enforces the same matrix.
@@ -63,7 +72,7 @@ export default function AppHeader({ items, title }) {
                 <button
                   key={item.label}
                   type="button"
-                  onClick={item.onClick}
+                  onClick={() => guard(() => item.onClick?.())}
                   className={linkClass(item.active)}
                 >
                   {item.label}
@@ -73,6 +82,7 @@ export default function AppHeader({ items, title }) {
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  onClick={go(item.to)}
                   className={({ isActive }) => linkClass(isActive)}
                 >
                   {item.label}
@@ -109,7 +119,7 @@ export default function AppHeader({ items, title }) {
                   type="button"
                   onClick={() => {
                     setOpen(false)
-                    item.onClick?.()
+                    guard(() => item.onClick?.())
                   }}
                   className={mobileLinkClass(item.active)}
                 >
@@ -120,7 +130,7 @@ export default function AppHeader({ items, title }) {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  onClick={() => setOpen(false)}
+                  onClick={go(item.to)}
                   className={({ isActive }) => mobileLinkClass(isActive)}
                 >
                   {item.label}

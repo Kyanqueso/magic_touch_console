@@ -1,18 +1,32 @@
 import { api, qs } from './http.js'
+import { maskTIN, maskZip } from '../lib/masks.js'
+import { COMPANY_TYPES, TAX_TYPES, TERMS, WTAX_ATC } from '../lib/options.js'
+
+// `edit` tells the inline table editor which control to use, so a table field
+// behaves like the same field on the add form: government IDs auto-format as
+// you type, and the picklists are picked from. See CellEditor for the shape.
+// Columns with no `edit` are plain text; id / scope / dateAdded are read-only.
+const COMMON_COLUMNS = [
+  { key: 'address', label: 'Address' },
+  { key: 'zip', label: 'Zip Code', edit: { mask: maskZip, inputMode: 'numeric' } },
+  { key: 'terms', label: 'Terms', edit: { select: TERMS } },
+  {
+    key: 'tin',
+    label: 'TIN',
+    edit: { mask: maskTIN, inputMode: 'numeric', placeholder: '000-000-000-000' },
+  },
+  { key: 'branchCode', label: 'Branch Code' },
+  { key: 'companyType', label: 'Company Type', edit: { select: COMPANY_TYPES } },
+  { key: 'taxType', label: 'Tax Type', edit: { select: TAX_TYPES } },
+  { key: 'wtax1', label: 'WTAX ATC 1', edit: { select: WTAX_ATC } },
+  { key: 'wtax2', label: 'WTAX ATC 2', edit: { select: WTAX_ATC } },
+]
 
 export const CUSTOMER_COLUMNS = [
   { key: 'id', label: 'Customer ID' },
   { key: 'scope', label: 'Scope' },
   { key: 'name', label: 'Customer Name' },
-  { key: 'address', label: 'Customer Address' },
-  { key: 'zip', label: 'Zip Code' },
-  { key: 'terms', label: 'Terms' },
-  { key: 'tin', label: 'TIN' },
-  { key: 'branchCode', label: 'Branch Code' },
-  { key: 'companyType', label: 'Company Type' },
-  { key: 'taxType', label: 'Tax Type' },
-  { key: 'wtax1', label: 'WTAX ATC 1' },
-  { key: 'wtax2', label: 'WTAX ATC 2' },
+  ...COMMON_COLUMNS.map((c) => (c.key === 'address' ? { ...c, label: 'Customer Address' } : c)),
   { key: 'dateAdded', label: 'Date Added' },
 ]
 
@@ -20,15 +34,7 @@ export const SUPPLIER_COLUMNS = [
   { key: 'id', label: 'Supplier ID' },
   { key: 'scope', label: 'Scope' },
   { key: 'name', label: 'Supplier Name' },
-  { key: 'address', label: 'Supplier Address' },
-  { key: 'zip', label: 'Zip Code' },
-  { key: 'terms', label: 'Terms' },
-  { key: 'tin', label: 'TIN' },
-  { key: 'branchCode', label: 'Branch Code' },
-  { key: 'companyType', label: 'Company Type' },
-  { key: 'taxType', label: 'Tax Type' },
-  { key: 'wtax1', label: 'WTAX ATC 1' },
-  { key: 'wtax2', label: 'WTAX ATC 2' },
+  ...COMMON_COLUMNS.map((c) => (c.key === 'address' ? { ...c, label: 'Supplier Address' } : c)),
 ]
 
 // Customers and Suppliers share one backend shape (PartyRequest / PartyResponse).

@@ -12,7 +12,7 @@ const PANEL_H = 280
 export default function Select({
   value,
   onChange,
-  options,
+  options: given,
   placeholder = 'Select...',
   size = 'md',
   wrapperClassName = '',
@@ -23,6 +23,13 @@ export default function Select({
   const [active, setActive] = useState(-1)
   const rootRef = useRef(null)
   const panelRef = useRef(null)
+
+  // A stored value that isn't in the list still has to be shown, or the field
+  // reads as empty and saving would quietly wipe it.
+  const options =
+    value && !given.some((o) => o.value === value)
+      ? [...given, { value, label: String(value) }]
+      : given
 
   const selected = options.find((o) => o.value === value)
   const pos = usePopoverPosition(open, rootRef, { height: PANEL_H, matchWidth: true })

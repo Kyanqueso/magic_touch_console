@@ -8,7 +8,7 @@
 // 0), the rule is stricter than the API on purpose: silently saving something
 // other than what was typed is worse than being told it's wrong.
 
-import { COMPANY_TYPES, TAX_TYPES } from '../components/CompanyFormModal.jsx'
+import { ACCOUNT_CLASSES, COMPANY_TYPES, TAX_TYPES } from './options.js'
 
 const text = (v) => String(v ?? '').trim()
 
@@ -121,8 +121,6 @@ export function validatePartyRow(row) {
     wtax2: atcError(row.wtax2),
   })
 }
-
-export const ACCOUNT_CLASSES = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense']
 
 export function validateAccountRow(row, rows = []) {
   return clean({

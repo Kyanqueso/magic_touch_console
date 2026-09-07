@@ -21,11 +21,12 @@ import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import ActionConfirmDialog, { actionAlert } from '../components/ActionConfirmDialog.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import Loading from '../components/Loading.jsx'
-import EditableCell from '../components/EditableCell.jsx'
+import CellEditor from '../components/CellEditor.jsx'
 import LeaveEditDialog from '../components/LeaveEditDialog.jsx'
 import useAutoAlert from '../hooks/useAutoAlert.js'
-import { maskPercent } from '../lib/masks.js'
+import { ACCOUNT_CLASSES, ACCOUNT_SUB_TYPES } from '../lib/options.js'
 import { validateAccountRow, validateRows, countErrors } from '../lib/validate.js'
+import { useUnsavedChanges } from '../lib/unsavedChanges.jsx'
 import {
   listCategories,
   listAccounts,
@@ -43,34 +44,19 @@ function errMessage(e) {
 
 const toItem = (a) => ({ id: a.id, primary: a.code, secondary: a.title })
 
-// Only Tax Rate gets live masking in the inline editor for now.
-const maskCell = (key, value) => (key === 'taxRate' ? maskPercent(value) : value)
-
 const TABS = [
   { value: 'active', label: 'Active' },
   { value: 'archive', label: 'Archive' },
 ]
 
-const SUB_TYPES = [
-  'Current Asset',
-  'Non Current Asset',
-  'Current Liability',
-  'Non Current Liability',
-  'Equity',
-  'Revenue',
-  'Direct Cost',
-  'Operating Expense',
-  'Non Taxable',
-  'Other',
-]
-
+// `edit` mirrors the Add Account form, so the table offers the same choices.
 const COLUMNS = [
   { key: 'code', label: 'Account Code' },
   { key: 'title', label: 'Account Title' },
-  { key: 'type', label: 'Type' },
-  { key: 'subType', label: 'Sub Type' },
+  { key: 'type', label: 'Type', edit: { select: ACCOUNT_CLASSES } },
+  { key: 'subType', label: 'Sub Type', edit: { select: ACCOUNT_SUB_TYPES } },
   { key: 'atcCode', label: 'ATC Code' },
-  { key: 'taxRate', label: 'Tax Rate' },
+  { key: 'taxRate', label: 'Tax Rate', edit: { number: 'percent', min: 0, max: 100, suffix: '%' } },
   { key: 'referenceForm', label: 'Reference Form' },
 ]
 
@@ -171,7 +157,9 @@ export default function ChartOfAccountsPage() {
         return !was || Object.keys(r).some((k) => r[k] !== was[k])
       }))
 
-  // Leaving mid-edit throws the draft away, so ask first.
+  // Leaving mid-edit throws the draft away, so ask first — locally for the
+  // tabs here, and through the shared guard for the header nav.
+  useUnsavedChanges(dirty, exitEdit)
   function guard(action) {
     if (dirty) setLeaveTo(() => action)
     else action()
@@ -574,7 +562,7 @@ export default function ChartOfAccountsPage() {
         onClose={() => setAddOpen(false)}
         onAdd={handleAddAccount}
         categories={categories}
-        subTypes={SUB_TYPES}
+        subTypes={ACCOUNT_SUB_TYPES}
       />
 
       <ConfirmDialog
@@ -657,10 +645,11 @@ function AccountTable({ rows, editing, tab, errors = {}, onCell, onRowAction, on
               {COLUMNS.map((c) => (
                 <td key={c.key} className="px-3 py-2">
                   {editing ? (
-                    <EditableCell
+                    <CellEditor
+                      spec={c.edit}
                       value={row[c.key]}
                       error={errors[row.id]?.[c.key]}
-                      onChange={(v) => onCell(row.id, c.key, maskCell(c.key, v))}
+                      onChange={(v) => onCell(row.id, c.key, v)}
                     />
                   ) : (
                     <span className="text-content">{row[c.key] || '—'}</span>
@@ -711,12 +700,12 @@ function AccountCards({ rows, editing, tab, errors = {}, onCell, onRowAction, on
               {editing ? (
                 <div className="space-y-2">
                   {COLUMNS.map((c) => (
-                    <EditableCell
+                    <CellEditor
                       key={c.key}
+                      spec={{ placeholder: c.label, ...c.edit }}
                       value={row[c.key]}
                       error={errors[row.id]?.[c.key]}
-                      placeholder={c.label}
-                      onChange={(v) => onCell(row.id, c.key, maskCell(c.key, v))}
+                      onChange={(v) => onCell(row.id, c.key, v)}
                     />
                   ))}
                   <div className="flex justify-end">

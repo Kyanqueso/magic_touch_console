@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { AuthProvider } from './lib/auth.jsx'
+import { UnsavedChangesProvider } from './lib/unsavedChanges.jsx'
 import './index.css'
 
 createRoot(document.getElementById('root')).render(
@@ -11,7 +12,9 @@ createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <UnsavedChangesProvider>
+            <App />
+          </UnsavedChangesProvider>
         </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>

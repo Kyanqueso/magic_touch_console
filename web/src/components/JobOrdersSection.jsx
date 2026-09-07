@@ -11,8 +11,6 @@ import {
 } from 'lucide-react'
 import Select from './Select.jsx'
 import Alert from './Alert.jsx'
-import DateField from './DateField.jsx'
-import NumberField from './NumberField.jsx'
 import EmptyState from './EmptyState.jsx'
 import Loading from './Loading.jsx'
 import Pagination from './Pagination.jsx'
@@ -21,12 +19,13 @@ import ConfirmDialog from './ConfirmDialog.jsx'
 import ActionConfirmDialog, { actionAlert } from './ActionConfirmDialog.jsx'
 import AddJobOrderModal from './AddJobOrderModal.jsx'
 import JobOrderDetail from './JobOrderDetail.jsx'
-import EditableCell from './EditableCell.jsx'
+import CellEditor from './CellEditor.jsx'
 import EditBar from './EditBar.jsx'
 import LeaveEditDialog from './LeaveEditDialog.jsx'
 import useTableEdit from '../hooks/useTableEdit.js'
 import useAutoAlert from '../hooks/useAutoAlert.js'
 import { validateJobOrderRow } from '../lib/validate.js'
+import { useUnsavedChanges } from '../lib/unsavedChanges.jsx'
 import { formatDate, peso } from '../lib/format.js'
 import { listParties } from '../api/parties.js'
 import { listMaterials } from '../api/materials.js'
@@ -55,6 +54,15 @@ const SORT_OPTIONS = [
 ]
 
 const EDITABLE = ['jobDescription', 'dateOrdered', 'deliveryDate', 'qty', 'unitPrice']
+
+// Same controls the Add Job Order form uses for these fields.
+const EDIT_SPECS = {
+  jobDescription: {},
+  dateOrdered: { date: true },
+  deliveryDate: { date: true },
+  qty: { number: 'integer', min: 0 },
+  unitPrice: { number: 'money', min: 0 },
+}
 
 function errMessage(e) {
   if (e?.fields) return Object.values(e.fields).join(' ')
@@ -182,8 +190,10 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
     reload()
   }, validateJobOrderRow)
 
-  // Leaving mid-edit throws the draft away, so ask first.
+  // Leaving mid-edit throws the draft away, so ask first — locally for the
+  // tabs here, and through the shared guard for the header and section nav.
   const [leaveTo, setLeaveTo] = useState(null)
+  useUnsavedChanges(edit.dirty, edit.cancel)
   function guard(action) {
     if (edit.dirty) setLeaveTo(() => action)
     else action()
@@ -454,31 +464,10 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
                     const editable = edit.editing && EDITABLE.includes(c.key)
                     const error = editable ? edit.errorsFor(r.id)[c.key] : undefined
                     let content = cell(r[c.key], c.type)
-                    if (editable && c.type === 'date') {
+                    if (editable) {
                       content = (
-                        <DateField
-                          size="sm"
-                          wrapperClassName="min-w-44"
-                          value={r[c.key] ?? ''}
-                          error={error}
-                          onChange={(v) => edit.setCell(r.id, c.key, v)}
-                        />
-                      )
-                    } else if (editable && (c.key === 'qty' || c.key === 'unitPrice')) {
-                      content = (
-                        <NumberField
-                          size="sm"
-                          mode={c.key === 'unitPrice' ? 'money' : 'integer'}
-                          min={0}
-                          wrapperClassName="min-w-28"
-                          value={r[c.key] ?? ''}
-                          error={error}
-                          onChange={(v) => edit.setCell(r.id, c.key, v)}
-                        />
-                      )
-                    } else if (editable) {
-                      content = (
-                        <EditableCell
+                        <CellEditor
+                          spec={EDIT_SPECS[c.key]}
                           value={r[c.key]}
                           error={error}
                           onChange={(v) => edit.setCell(r.id, c.key, v)}
