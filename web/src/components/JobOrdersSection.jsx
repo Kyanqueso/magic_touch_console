@@ -27,12 +27,11 @@ import useAutoAlert from '../hooks/useAutoAlert.js'
 import { validateJobOrderRow } from '../lib/validate.js'
 import { useUnsavedChanges } from '../lib/unsavedChanges.jsx'
 import { formatDate, peso } from '../lib/format.js'
-import { listParties } from '../api/parties.js'
-import { listMaterials } from '../api/materials.js'
 import {
   JOB_ORDER_LIST_COLUMNS,
   listJobOrders,
   getJobOrder,
+  getJobOrderLookups,
   createJobOrder,
   updateJobOrder,
   closeJobOrder,
@@ -104,19 +103,15 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
 
   const term = query.trim().toLowerCase()
 
-  // catalog lookups for the customer / material pickers
+  // catalog lookups for the customer / material pickers (works without a
+  // customers/materials grant — the endpoint is gated by job_orders)
   useEffect(() => {
     let cancelled = false
-    Promise.all([
-      listParties({ kind: 'customer', profileId: String(profileId) }, { size: 500 }),
-      listMaterials({ size: 500 }),
-    ])
-      .then(([cust, mats]) => {
+    getJobOrderLookups(profileId)
+      .then(({ customers, materials }) => {
         if (cancelled) return
-        setCustomerOptions(cust.items.map((c) => ({ value: c.id, label: c.name })))
-        setMaterialOptions(
-          mats.map((m) => ({ value: m.id, label: `${m.code} — ${m.description}` })),
-        )
+        setCustomerOptions(customers)
+        setMaterialOptions(materials)
       })
       .catch(() => {})
     return () => {

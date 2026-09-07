@@ -7,11 +7,14 @@ import com.magictouch.console.common.page.PageResponse;
 import com.magictouch.console.common.page.SortSpec;
 import com.magictouch.console.directory.data.Customer;
 import com.magictouch.console.directory.data.CustomerRepository;
+import com.magictouch.console.joborders.api.dto.CustomerOption;
+import com.magictouch.console.joborders.api.dto.JobOrderLookups;
 import com.magictouch.console.joborders.api.dto.JobOrderMaterialRequest;
 import com.magictouch.console.joborders.api.dto.JobOrderMaterialResponse;
 import com.magictouch.console.joborders.api.dto.JobOrderRequest;
 import com.magictouch.console.joborders.api.dto.JobOrderResponse;
 import com.magictouch.console.joborders.api.dto.JobOrderSummaryRow;
+import com.magictouch.console.materials.api.dto.MaterialOption;
 import com.magictouch.console.joborders.data.JobOrder;
 import com.magictouch.console.joborders.data.JobOrderMaterial;
 import com.magictouch.console.joborders.data.JobOrderRepository;
@@ -65,6 +68,19 @@ public class JobOrderService {
 
     public JobOrderResponse get(long profileId, long id) {
         return JobOrderResponse.from(require(profileId, id));
+    }
+
+    // Picker data for the job-order screens. Gated by job_orders, so a user needs
+    // no customers/materials grant of their own to fill these dropdowns.
+    public JobOrderLookups lookups(long profileId) {
+        profileGuard.require(profileId);
+        List<CustomerOption> custs = customers
+                .findVisible(profileId, false, null, null, Sort.by("name"))
+                .list().stream().map(CustomerOption::from).toList();
+        List<MaterialOption> mats = materials
+                .search(false, null, null, Sort.by("code"))
+                .list().stream().map(MaterialOption::from).toList();
+        return new JobOrderLookups(custs, mats);
     }
 
     // Full job orders for one customer, in a single query, for the summary screen.

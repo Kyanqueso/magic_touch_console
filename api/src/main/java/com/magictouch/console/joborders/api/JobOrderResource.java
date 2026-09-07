@@ -2,6 +2,7 @@ package com.magictouch.console.joborders.api;
 
 import com.magictouch.console.common.page.PageQuery;
 import com.magictouch.console.common.page.PageResponse;
+import com.magictouch.console.joborders.api.dto.JobOrderLookups;
 import com.magictouch.console.joborders.api.dto.JobOrderRequest;
 import com.magictouch.console.joborders.api.dto.JobOrderResponse;
 import com.magictouch.console.joborders.api.dto.JobOrderSummaryRow;
@@ -53,6 +54,12 @@ public class JobOrderResource {
     public List<JobOrderResponse> summary(@PathParam("profileId") long profileId,
                                           @QueryParam("customerId") long customerId) {
         return service.summaryFor(profileId, customerId);
+    }
+
+    @GET
+    @Path("lookups")
+    public JobOrderLookups lookups(@PathParam("profileId") long profileId) {
+        return service.lookups(profileId);
     }
 
     @GET

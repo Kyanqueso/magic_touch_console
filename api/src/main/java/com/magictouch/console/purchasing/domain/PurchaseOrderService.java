@@ -4,6 +4,7 @@ import com.magictouch.console.common.error.ApiException;
 import com.magictouch.console.common.page.PageQuery;
 import com.magictouch.console.common.page.PageResponse;
 import com.magictouch.console.common.page.SortSpec;
+import com.magictouch.console.materials.api.dto.MaterialOption;
 import com.magictouch.console.materials.data.Material;
 import com.magictouch.console.materials.data.MaterialRepository;
 import com.magictouch.console.profiles.domain.ProfileGuard;
@@ -63,6 +64,13 @@ public class PurchaseOrderService {
 
     public PurchaseOrderResponse get(long profileId, long supplierId, long id) {
         return PurchaseOrderResponse.from(require(profileId, supplierId, id));
+    }
+
+    // Material picker for the PO screen. Gated by the suppliers module (the PO path),
+    // so a purchasing user needs no materials grant of their own.
+    public List<MaterialOption> materialOptions() {
+        return materials.search(false, null, null, Sort.by("code"))
+                .list().stream().map(MaterialOption::from).toList();
     }
 
     @Transactional

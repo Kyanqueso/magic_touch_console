@@ -246,6 +246,14 @@ class JobOrderResourceTest extends AuthenticatedApiTest {
     }
 
     @Test
+    void lookupsReturnCustomersAndMaterials() {
+        given().when().get(base + "/lookups")
+                .then().statusCode(200)
+                .body("customers.name", hasItem("Sunrise Trading Co."))
+                .body("materials.code", hasItem(materialCode));
+    }
+
+    @Test
     void summaryReturnsFullJobOrdersForOneCustomer() {
         String loc = given().contentType("application/json")
                 .body("""

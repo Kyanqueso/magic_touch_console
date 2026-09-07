@@ -92,6 +92,16 @@ class AuthorizationTest {
         as(u).when().get("/api/v1/profiles/1/job-orders").then().statusCode(403);
     }
 
+    /** The job-order picker endpoints ride on the job_orders grant, not customers/materials. */
+    @Test
+    void jobOrdersGrantCoversItsLookups() {
+        UUID u = testUsers.withAccess("job_orders", AccessLevel.VIEWER);
+        as(u).when().get("/api/v1/profiles/1/job-orders/lookups").then().statusCode(not(403));
+        // ...but a materials grant alone does not open the job-order path
+        UUID m = testUsers.withAccess("materials", AccessLevel.EDITOR);
+        as(m).when().get("/api/v1/profiles/1/job-orders/lookups").then().statusCode(403);
+    }
+
     /** A nested path is governed by the nested module, not by Corporate Profiles. */
     @Test
     void nestedCustomerPathUsesTheCustomersModule() {

@@ -172,6 +172,21 @@ export const getJobOrder = (pid, id) => api.get(`${jobBase(pid)}/${id}`).then(to
 // Every active job order for one customer, materials included, in a single call.
 export const getJobOrderSummary = (pid, customerId) =>
   api.get(`${jobBase(pid)}/summary${qs({ customerId })}`).then((rows) => rows.map(toJob))
+
+// Customer + material picker data. Gated by job_orders, so it works even if the
+// user has no customers / materials grant of their own.
+export async function getJobOrderLookups(pid) {
+  const d = await api.get(`${jobBase(pid)}/lookups`)
+  return {
+    customers: (d.customers || []).map((c) => ({ value: String(c.id), label: c.name })),
+    materials: (d.materials || []).map((m) => ({
+      value: String(m.id),
+      label: `${m.code} — ${m.name}`,
+      code: m.code,
+      unitPrice: m.unitPrice,
+    })),
+  }
+}
 export const createJobOrder = (pid, v) => api.post(jobBase(pid), fromJob(v)).then(toJob)
 export const updateJobOrder = (pid, id, v) => api.put(`${jobBase(pid)}/${id}`, fromJob(v)).then(toJob)
 export const closeJobOrder = (pid, id) => api.post(`${jobBase(pid)}/${id}/close`).then(toJob)

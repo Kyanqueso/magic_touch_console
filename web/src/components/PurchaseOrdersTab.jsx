@@ -20,9 +20,9 @@ import { LineItems } from './DocLineItems.jsx'
 import useAutoAlert from '../hooks/useAutoAlert.js'
 import { peso, formatDate } from '../lib/format.js'
 import { printDocument } from '../lib/print.js'
-import { listMaterials } from '../api/materials.js'
 import {
   listPurchaseOrders,
+  listPoMaterialOptions,
   getPurchaseOrder,
   createPurchaseOrder,
   updatePurchaseOrder,
@@ -66,23 +66,15 @@ export default function PurchaseOrdersTab({ supplier, profileId }) {
 
   useEffect(() => {
     let cancelled = false
-    listMaterials({ size: 500 })
-      .then((mats) => {
-        if (cancelled) return
-        setMaterialOptions(
-          mats.map((m) => ({
-            value: m.id,
-            label: `${m.code} — ${m.description}`,
-            code: m.code,
-            unitPrice: m.unitPrice,
-          })),
-        )
+    listPoMaterialOptions(profileId, sid)
+      .then((opts) => {
+        if (!cancelled) setMaterialOptions(opts)
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [profileId, sid])
 
   useEffect(() => {
     let cancelled = false

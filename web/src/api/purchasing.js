@@ -86,6 +86,18 @@ export async function listPurchaseOrders(pid, sid, { tab = 'active', q = '', pag
 export const getPurchaseOrder = (pid, sid, id) =>
   api.get(`${base(pid, sid)}/purchase-orders/${id}`).then(toPo)
 
+// Material picker data for the PO screen. Gated by the suppliers module (the PO
+// path), so it works without a materials grant.
+export async function listPoMaterialOptions(pid, sid) {
+  const rows = await api.get(`${base(pid, sid)}/purchase-orders/material-options`)
+  return rows.map((m) => ({
+    value: String(m.id),
+    label: `${m.code} — ${m.name}`,
+    code: m.code,
+    unitPrice: m.unitPrice,
+  }))
+}
+
 export async function createPurchaseOrder(pid, sid, values) {
   const po = await api.post(`${base(pid, sid)}/purchase-orders`, fromPo(values))
   for (const it of (values.items || []).filter((x) => x.materialId)) {

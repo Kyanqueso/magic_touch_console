@@ -2,6 +2,7 @@ package com.magictouch.console.purchasing.api;
 
 import com.magictouch.console.common.page.PageQuery;
 import com.magictouch.console.common.page.PageResponse;
+import com.magictouch.console.materials.api.dto.MaterialOption;
 import com.magictouch.console.purchasing.api.dto.PurchaseOrderRequest;
 import com.magictouch.console.purchasing.api.dto.PurchaseOrderResponse;
 import com.magictouch.console.purchasing.api.dto.PurchaseOrderSummaryRow;
@@ -45,6 +46,12 @@ public class PurchaseOrderResource {
             @QueryParam("tab") @DefaultValue("active") String tab) {
         return service.list(profileId, supplierId, PageQuery.of(page, size), sort, q,
                 "archive".equalsIgnoreCase(tab));
+    }
+
+    @GET
+    @Path("material-options")
+    public java.util.List<MaterialOption> materialOptions() {
+        return service.materialOptions();
     }
 
     @GET
