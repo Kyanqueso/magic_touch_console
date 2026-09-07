@@ -20,6 +20,7 @@ import Alert from './Alert.jsx'
 import Modal from './Modal.jsx'
 import Pagination from './Pagination.jsx'
 import SegmentedTabs from './SegmentedTabs.jsx'
+import Loading from './Loading.jsx'
 import CompanyFormModal from './CompanyFormModal.jsx'
 import ConfirmDialog from './ConfirmDialog.jsx'
 import ActionConfirmDialog, { actionAlert } from './ActionConfirmDialog.jsx'
@@ -373,11 +374,8 @@ export default function EntityListPage({
             <tbody className="divide-y divide-purple-light">
               {loading && !edit.editing ? (
                 <tr>
-                  <td
-                    colSpan={columns.length + 2}
-                    className="px-3 py-10 text-center text-content-muted"
-                  >
-                    <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+                  <td colSpan={columns.length + 2}>
+                    <Loading label={`Loading ${detailNoun}s...`} className="py-10" />
                   </td>
                 </tr>
               ) : (edit.editing ? edit.draft : pageRows).length === 0 ? (

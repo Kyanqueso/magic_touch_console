@@ -8,6 +8,7 @@ import SegmentedTabs from '../components/SegmentedTabs.jsx'
 import AddCorporateProfileModal from '../components/AddCorporateProfileModal.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import CorporateProfileDetail from '../components/CorporateProfileDetail.jsx'
+import Loading from '../components/Loading.jsx'
 import useAutoAlert from '../hooks/useAutoAlert.js'
 import { formatDate } from '../lib/format.js'
 import {
@@ -229,9 +230,7 @@ export default function CorporateProfilesPage() {
        )}
 
        {selectedId && !selected ? (
-        <div className="mt-16 flex justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-content-muted" />
-        </div>
+        <Loading label="Loading corporate profile..." />
        ) : selected ? (
         <CorporateProfileDetail
           profile={selected}
@@ -294,9 +293,7 @@ export default function CorporateProfilesPage() {
 
         {/* Cards */}
         {loading ? (
-          <div className="mt-16 flex justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-content-muted" />
-          </div>
+          <Loading label="Loading corporate profiles..." />
         ) : pageItems.length === 0 ? (
           <p className="mt-10 text-center text-base text-content-muted">
             {tab === 'archive'

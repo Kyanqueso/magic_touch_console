@@ -20,6 +20,7 @@ import AddAccountModal from '../components/AddAccountModal.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import ActionConfirmDialog, { actionAlert } from '../components/ActionConfirmDialog.jsx'
 import EmptyState from '../components/EmptyState.jsx'
+import Loading from '../components/Loading.jsx'
 import useAutoAlert from '../hooks/useAutoAlert.js'
 import { maskPercent } from '../lib/masks.js'
 import {
@@ -357,11 +358,7 @@ export default function ChartOfAccountsPage() {
 
         {/* Category accordion */}
         <div className="mt-6 space-y-4">
-          {loading && (
-            <div className="flex justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-content-muted" />
-            </div>
-          )}
+          {loading && <Loading label="Loading chart of accounts..." />}
           {!loading && visibleCategories.map((cat) => {
             const editing = editingId === cat.id
             const open = editing || term ? true : expanded.has(cat.id)

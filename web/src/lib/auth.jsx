@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { supabase } from './supabase.js'
+import { LoadingScreen } from '../components/Loading.jsx'
 import { getUser } from '../api/users.js'
 
 const AuthContext = createContext({
@@ -190,7 +191,7 @@ export function RequireAuth({ children }) {
   const location = useLocation()
 
   if (loading) {
-    return <div className="min-h-screen bg-component-bg" />
+    return <LoadingScreen label="Loading your session..." />
   }
   if (!session) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />

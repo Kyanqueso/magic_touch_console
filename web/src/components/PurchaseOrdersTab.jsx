@@ -3,7 +3,6 @@ import {
   Archive,
   ChevronDown,
   ChevronRight,
-  Loader2,
   Pencil,
   Plus,
   Printer,
@@ -12,6 +11,7 @@ import {
 } from 'lucide-react'
 import Alert from './Alert.jsx'
 import EmptyState from './EmptyState.jsx'
+import Loading from './Loading.jsx'
 import Pagination from './Pagination.jsx'
 import SegmentedTabs from './SegmentedTabs.jsx'
 import ActionConfirmDialog, { actionAlert } from './ActionConfirmDialog.jsx'
@@ -232,9 +232,7 @@ export default function PurchaseOrdersTab({ supplier, profileId }) {
       </div>
 
       {loading ? (
-        <div className="mt-16 flex justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-content-muted" />
-        </div>
+        <Loading label="Loading purchase orders..." />
       ) : rows.length === 0 ? (
         <div className="mt-6">
           <EmptyState

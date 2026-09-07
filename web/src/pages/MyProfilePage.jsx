@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
-  Loader2,
   Pencil,
   Plus,
   RotateCcw,
@@ -20,6 +19,7 @@ import SegmentedTabs from '../components/SegmentedTabs.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import ActionConfirmDialog, { actionAlert } from '../components/ActionConfirmDialog.jsx'
 import EmptyState from '../components/EmptyState.jsx'
+import Loading from '../components/Loading.jsx'
 import ResetPasswordModal from '../components/ResetPasswordModal.jsx'
 import AddUserModal from '../components/AddUserModal.jsx'
 import AccessToggle from '../components/AccessToggle.jsx'
@@ -105,9 +105,7 @@ export default function MyProfilePage() {
     return (
       <div className="min-h-full bg-component-bg">
         <AppHeader />
-        <div className="mt-24 flex justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-content-muted" />
-        </div>
+        <Loading label="Loading your profile..." className="mt-16" />
       </div>
     )
   }
@@ -369,11 +367,7 @@ function UserAccessPanel({ userId, onBack, onSaved, onError }) {
   }
 
   if (!user) {
-    return (
-      <div className="mt-16 flex justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-content-muted" />
-      </div>
-    )
+    return <Loading label="Loading user..." />
   }
 
   const view = editing ? draft : rows
@@ -592,9 +586,7 @@ function ManageUsers({ modules, onOpen, onNotify }) {
       </div>
 
       {loading ? (
-        <div className="mt-16 flex justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-content-muted" />
-        </div>
+        <Loading label="Loading users..." />
       ) : rows.length === 0 ? (
         <div className="mt-6">
           <EmptyState

@@ -7,7 +7,6 @@ import {
   ChevronRight,
   ClipboardList,
   Coins,
-  Loader2,
   Lock,
   LockOpen,
   Pencil,

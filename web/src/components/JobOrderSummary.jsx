@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ChevronDown, ChevronRight, Info, Loader2, Printer } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, Info, Printer } from 'lucide-react'
 import Button from './Button.jsx'
 import Select from './Select.jsx'
 import EmptyState from './EmptyState.jsx'
+import Loading from './Loading.jsx'
 import Pagination from './Pagination.jsx'
 import { formatDate } from '../lib/format.js'
 import { printDocument } from '../lib/print.js'
@@ -155,9 +156,7 @@ export default function JobOrderSummary({ profileId, customerId, customerName, d
       </div>
 
       {loading ? (
-        <div className="mt-16 flex justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-content-muted" />
-        </div>
+        <Loading label="Loading summary..." />
       ) : titles.length === 0 ? (
         <div className="mt-8">
           <EmptyState icon={Info} title="Nothing to summarize" subtitle="Add job orders first." />

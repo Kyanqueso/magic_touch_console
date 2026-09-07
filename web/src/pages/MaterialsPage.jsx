@@ -21,6 +21,7 @@ import ActionConfirmDialog, { actionAlert } from '../components/ActionConfirmDia
 import EmptyState from '../components/EmptyState.jsx'
 import AddMaterialModal from '../components/AddMaterialModal.jsx'
 import NumberField from '../components/NumberField.jsx'
+import Loading from '../components/Loading.jsx'
 import useAutoAlert from '../hooks/useAutoAlert.js'
 import { peso } from '../lib/format.js'
 import {
@@ -308,11 +309,7 @@ export default function MaterialsPage() {
         </div>
 
         <div className="mt-6 space-y-4">
-          {loading && (
-            <div className="flex justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-content-muted" />
-            </div>
-          )}
+          {loading && <Loading label="Loading materials..." />}
           {!loading && visibleGroups.map((group) => {
             const editing = editingId === group.id
             const open = editing || term ? true : expanded.has(group.id)
