@@ -10,8 +10,8 @@ public record VoucherResponse(
         Long id,
         String number,
         Long corporateProfileId,
-        Long supplierInvoiceId,
-        String supplierInvoiceNumber,
+        Long salesInvoiceId,
+        String salesInvoiceNumber,
         Long purchaseOrderId,
         Long supplierId,
         String supplierName,
@@ -28,10 +28,10 @@ public record VoucherResponse(
 ) {
 
     public static VoucherResponse from(Voucher v) {
-        var po = v.supplierInvoice.purchaseOrder;
+        var po = v.salesInvoice.purchaseOrder;
         return new VoucherResponse(
                 v.id, v.number(), v.corporateProfileId,
-                v.supplierInvoice.id, v.supplierInvoice.number(),
+                v.salesInvoice.id, v.salesInvoice.number(),
                 po.id, po.supplier.id, po.supplier.name,
                 v.voucherDate, v.netAmount, v.paid, v.paidAt,
                 v.debitAccountId, v.creditCashAccountId, v.creditPayableAccountId,

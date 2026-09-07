@@ -1,6 +1,6 @@
 import { api, qs } from './http.js'
 import { maskTIN, maskZip } from '../lib/masks.js'
-import { COMPANY_TYPES, TAX_TYPES, TERMS, WTAX_ATC } from '../lib/options.js'
+import { COMPANY_TYPES, TAX_TYPES, TERMS, WTAX_ATC, joinAtc, splitAtc } from '../lib/options.js'
 
 // `edit` tells the inline table editor which control to use, so a table field
 // behaves like the same field on the add form: government IDs auto-format as
@@ -62,18 +62,6 @@ const SORT_MAP = {
   'name-desc': '-name',
   'id-asc': 'id',
   'id-desc': '-id',
-}
-
-// "WI011 (10%)"  <->  code "WI011" + rate 10
-function splitAtc(label) {
-  if (!label) return { code: null, rate: null }
-  const m = String(label).match(/^\s*([A-Za-z0-9]+)\s*(?:\(\s*([\d.]+)\s*%\s*\))?\s*$/)
-  if (!m) return { code: String(label).trim() || null, rate: null }
-  return { code: m[1], rate: m[2] != null ? Number(m[2]) : null }
-}
-function joinAtc(code, rate) {
-  if (!code) return ''
-  return rate != null ? `${code} (${Number(rate)}%)` : code
 }
 
 function toRow(p) {

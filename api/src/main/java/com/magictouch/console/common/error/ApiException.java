@@ -30,6 +30,10 @@ public class ApiException extends RuntimeException {
         return new ApiException(Response.Status.BAD_REQUEST, "BAD_REQUEST", message, null);
     }
 
+    public static ApiException forbidden(String message) {
+        return new ApiException(Response.Status.FORBIDDEN, "FORBIDDEN", message, null);
+    }
+
     /** A single field failed a rule the DTO annotations can't express (e.g. a cross-field or lookup check). */
     public static ApiException invalidField(String field, String message) {
         return new ApiException(Response.Status.BAD_REQUEST, "VALIDATION",

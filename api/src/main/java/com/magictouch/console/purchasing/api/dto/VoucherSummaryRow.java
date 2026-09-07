@@ -9,8 +9,8 @@ import java.time.OffsetDateTime;
 public record VoucherSummaryRow(
         Long id,
         String number,
-        Long supplierInvoiceId,
-        String supplierInvoiceNumber,
+        Long salesInvoiceId,
+        String salesInvoiceNumber,
         LocalDate voucherDate,
         BigDecimal netAmount,
         boolean paid,
@@ -20,7 +20,7 @@ public record VoucherSummaryRow(
 
     public static VoucherSummaryRow from(Voucher v) {
         return new VoucherSummaryRow(
-                v.id, v.number(), v.supplierInvoice.id, v.supplierInvoice.number(),
+                v.id, v.number(), v.salesInvoice.id, v.salesInvoice.number(),
                 v.voucherDate, v.netAmount, v.paid, v.isArchived(), v.createdAt);
     }
 }

@@ -1,38 +1,40 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Archive, Coins, Fingerprint, Pencil, Plus, ScrollText } from 'lucide-react'
+import { ArrowLeft, Archive, Coins, Fingerprint, Pencil, Plus, RotateCcw, ScrollText, Trash2 } from 'lucide-react'
 import Button from './Button.jsx'
 import Select from './Select.jsx'
 import DateField from './DateField.jsx'
 import EntityListPage from './EntityListPage.jsx'
 import JobOrdersSection from './JobOrdersSection.jsx'
 import SupplierDetail from './SupplierDetail.jsx'
-import { COMPANY_TYPES, TAX_TYPES } from '../lib/options.js'
+import { COMPANY_TYPES, TAX_TYPES, WTAX_ATC, splitAtc } from '../lib/options.js'
 import { useNavigationGuard } from '../lib/unsavedChanges.jsx'
 import { formatDate } from '../lib/format.js'
 import { maskTIN, maskSSS, maskPHIC, maskHDMF } from '../lib/masks.js'
 import { CUSTOMER_COLUMNS, SUPPLIER_COLUMNS } from '../api/parties.js'
 
-const WTAX = ['WI010', 'WI011', 'WI100', 'WI157', 'WI158', 'WC100', 'WC157', 'WC158', 'WC160']
 const FILING_TYPES = [
-  '1601 C',
-  '1601 E',
-  '1601 F',
-  '1604 C',
-  '1604 E',
-  '0619 E',
-  '0619 F',
-  '2550 M',
-  '2550 Q',
-  '2551 Q',
+  '1601C',
+  '1601E',
+  '1601F',
+  '1604C',
+  '1604E',
+  '0619E',
+  '0619F',
+  '2550M',
+  '2550Q',
+  '2551Q',
 ]
 
 const opts = (list) => list.map((o) => ({ value: o, label: o }))
 
-const RULES = {
+// tin/sss/phic/hdmf are required; DTI/SEC are optional but format-checked when filled.
+const REQUIRED_RULES = {
   tin: [/^\d{3}-\d{3}-\d{3}-\d{3}$/, 'Invalid TIN.'],
   sss: [/^\d{2}-\d{7}-\d$/, 'Invalid SSS.'],
   phic: [/^\d{2}-\d{9}-\d$/, 'Invalid PHIC.'],
   hdmf: [/^\d{4}-\d{4}-\d{4}$/, 'Invalid HDMF.'],
+}
+const OPTIONAL_RULES = {
   dtiNo: [/^\d{6,}$/, 'Invalid DTI No.'],
   secNo: [/^[A-Za-z]{2}\d{6,}$/, 'Invalid SEC No.'],
 }
@@ -62,15 +64,30 @@ export default function CorporateProfileDetail({
   onExitSection,
   onSave,
   onArchive,
+  onRestore,
+  onDelete,
 }) {
   const filled = profile.status === 'Filled Up' && Boolean(profile.details)
-  const [editing, setEditing] = useState(!filled)
+  const [editing, setEditing] = useState(!filled && !profile.archived)
   const [supplierDrill, setSupplierDrill] = useState(null)
   const guard = useNavigationGuard()
 
   useEffect(() => {
     if (section !== 'suppliers') setSupplierDrill(null)
   }, [section])
+
+  // An archived profile is read-only: no sections, no editing — only restore/delete.
+  if (profile.archived) {
+    return (
+      <ProfileSummary
+        profile={profile}
+        archived
+        onBack={onBack}
+        onRestore={onRestore}
+        onDelete={onDelete}
+      />
+    )
+  }
 
   if (section === 'customers' || section === 'suppliers') {
     const isCustomers = section === 'customers'
@@ -195,8 +212,20 @@ function ProfileForm({ profile, canCancel, onCancel, onBack, onSubmit }) {
     e.preventDefault()
     const next = {}
     if (!name.trim()) next.name = 'Corporate name is required.'
-    for (const [key, [re, msg]] of Object.entries(RULES)) {
+    for (const [key, [re, msg]] of Object.entries(REQUIRED_RULES)) {
       if (!re.test(form[key] || '')) next[key] = msg
+    }
+    for (const [key, [re, msg]] of Object.entries(OPTIONAL_RULES)) {
+      if (form[key]?.trim() && !re.test(form[key].trim())) next[key] = msg
+    }
+    const c1 = splitAtc(form.wtax1).code
+    const c2 = splitAtc(form.wtax2).code
+    if (c1 && c2 && c1.toUpperCase() === c2.toUpperCase()) {
+      next.wtax2 = 'WTAX ATC 1 and 2 must be different.'
+    }
+    const filled = form.filingTaxTypes.filter(Boolean).map((v) => v.trim())
+    if (new Set(filled.map((v) => v.toLowerCase())).size !== filled.length) {
+      next.filing = 'Filing tax types must all be different.'
     }
     if (Object.keys(next).length) {
       setErrors(next)
@@ -291,8 +320,8 @@ function ProfileForm({ profile, canCancel, onCancel, onBack, onSubmit }) {
 
         <Section title="Taxes">
           <div className="grid grid-cols-2 gap-4">
-            <SelectField label="WTAX ATC 1" value={form.wtax1} onChange={(v) => set('wtax1', v)} options={opts(WTAX)} />
-            <SelectField label="WTAX ATC 2" value={form.wtax2} onChange={(v) => set('wtax2', v)} options={opts(WTAX)} />
+            <SelectField label="WTAX ATC 1" value={form.wtax1} onChange={(v) => set('wtax1', v)} options={opts(WTAX_ATC)} />
+            <SelectField label="WTAX ATC 2" value={form.wtax2} onChange={(v) => set('wtax2', v)} error={errors.wtax2} options={opts(WTAX_ATC)} />
           </div>
 
           <div className="space-y-4">
@@ -307,6 +336,7 @@ function ProfileForm({ profile, canCancel, onCancel, onBack, onSubmit }) {
                 Add
               </button>
             </div>
+            {errors.filing && <p className="text-sm text-danger">{errors.filing}</p>}
             <div className="grid gap-4 sm:grid-cols-2">
               {form.filingTaxTypes.map((val, i) => (
                 <SelectField
@@ -385,11 +415,18 @@ function Field({ label, value, onChange, error, disabled, className = '' }) {
   )
 }
 
-function SelectField({ label, className = '', ...props }) {
+function SelectField({ label, className = '', error, ...props }) {
   return (
     <div className={className}>
       <label className="mb-2 block text-sm font-bold text-content">{label}</label>
-      <Select wrapperClassName="w-full" size="sm" placeholder="Select" {...props} />
+      <Select
+        wrapperClassName="w-full"
+        size="sm"
+        placeholder="Select"
+        invalid={Boolean(error)}
+        {...props}
+      />
+      {error && <p className="mt-1 text-sm text-danger">{error}</p>}
     </div>
   )
 }
@@ -443,7 +480,7 @@ const ACCENTS = {
   success: 'bg-success-tooltip-bg text-success-tooltip-icon',
 }
 
-function ProfileSummary({ profile, onBack, onEdit, onArchive }) {
+function ProfileSummary({ profile, onBack, onEdit, onArchive, onRestore, onDelete, archived = false }) {
   const d = profile.details || EMPTY_DETAILS
 
   return (
@@ -471,14 +508,29 @@ function ProfileSummary({ profile, onBack, onEdit, onArchive }) {
           )}
         </div>
         <div className="flex gap-2">
-          <Button variant="info" size="sm" onClick={onEdit}>
-            <Pencil className="h-4 w-4" />
-            Edit
-          </Button>
-          <Button variant="warning" size="sm" onClick={onArchive}>
-            <Archive className="h-4 w-4" />
-            Archive
-          </Button>
+          {archived ? (
+            <>
+              <Button variant="warning" size="sm" onClick={onRestore}>
+                <RotateCcw className="h-4 w-4" />
+                Restore
+              </Button>
+              <Button variant="danger" size="sm" onClick={onDelete}>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="info" size="sm" onClick={onEdit}>
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button variant="warning" size="sm" onClick={onArchive}>
+                <Archive className="h-4 w-4" />
+                Archive
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

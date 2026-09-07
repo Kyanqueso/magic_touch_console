@@ -140,6 +140,8 @@ public class AccessService {
                     throw ApiException.conflict("A user with that email already exists.");
                 });
 
+        enforceRoleChangeRules(id, u, body.role());
+
         String previousEmail = u.email;
         boolean emailChanged = !email.equalsIgnoreCase(previousEmail);
         if (emailChanged) {
@@ -257,7 +259,23 @@ public class AccessService {
         u.lastName = b.lastName().trim();
         u.email = b.email().trim().toLowerCase();
         u.phone = b.phone();
-        u.role = b.role() != null ? b.role() : UserRole.USER;
+        // Absent role keeps the current one; a new user's field already defaults to USER.
+        u.role = b.role() != null ? b.role() : u.role;
+    }
+
+    // Only an admin acting on someone else may change a role; nobody may change their own.
+    private void enforceRoleChangeRules(UUID targetId, AppUser target, UserRole requestedRole) {
+        if (requestedRole == null || requestedRole == target.role) {
+            return;
+        }
+        UUID actorId = CurrentUser.id().orElse(null);
+        if (actorId != null && actorId.equals(targetId)) {
+            throw ApiException.badRequest("You cannot change your own role.");
+        }
+        AppUser actor = actorId == null ? null : users.findById(actorId);
+        if (actor == null || actor.role != UserRole.ADMIN) {
+            throw ApiException.forbidden("Only an administrator can change a user's role.");
+        }
     }
 
     private void applyMatrix(UUID userId, Map<String, AccessLevel> grants) {

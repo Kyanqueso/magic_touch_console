@@ -8,47 +8,36 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+// A sales invoice raised against a purchase order.
 @Entity
-@Table(name = "vouchers")
-public class Voucher extends BaseEntity {
+@Table(name = "sales_invoices")
+public class SalesInvoice extends BaseEntity {
 
     @Column(name = "corporate_profile_id", nullable = false)
     public Long corporateProfileId;
 
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
-    @JoinColumn(name = "sales_invoice_id", nullable = false)
-    public SalesInvoice salesInvoice;
+    @JoinColumn(name = "purchase_order_id", nullable = false)
+    public PurchaseOrder purchaseOrder;
 
-    @Column(name = "voucher_date", nullable = false)
-    public LocalDate voucherDate;
+    @Column(name = "sinv_date", nullable = false)
+    public LocalDate sinvDate;
 
-    @Column(name = "net_amount", nullable = false, precision = 14, scale = 2)
-    public BigDecimal netAmount;
-
-    @Column(name = "is_paid", nullable = false)
-    public boolean paid;
-
-    @Column(name = "paid_at")
-    public OffsetDateTime paidAt;
-
+    // chart_of_accounts FKs — kept simple (plain ids) while the ledger model is TBD.
     @Column(name = "debit_account_id")
     public Long debitAccountId;
 
-    @Column(name = "credit_cash_account_id")
-    public Long creditCashAccountId;
-
-    @Column(name = "credit_payable_account_id")
-    public Long creditPayableAccountId;
+    @Column(name = "credit_account_id")
+    public Long creditAccountId;
 
     @Column(name = "archived_at")
     public OffsetDateTime archivedAt;
 
     public String number() {
-        return "VOUC-" + id;
+        return "S-INV-" + id;
     }
 
     public boolean isArchived() {

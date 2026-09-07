@@ -227,9 +227,39 @@ class JobOrderResourceTest extends AuthenticatedApiTest {
         given().when().delete(loc).then().statusCode(409);
         given().when().post(loc + "/archive").then().statusCode(204);
         given().when().get(loc).then().statusCode(200).body("archived", is(true));
+
+        // an archived job order is read-only until restored
+        given().contentType("application/json")
+                .body("{ \"customerId\": %d, \"jobDescription\": \"nope\" }".formatted(customerId))
+                .when().put(loc).then().statusCode(409);
+        given().when().post(loc + "/close").then().statusCode(409);
+
         given().when().post(loc + "/restore").then().statusCode(204);
         given().when().post(loc + "/archive").then().statusCode(204);
         given().when().delete(loc).then().statusCode(204);
         given().when().get(loc).then().statusCode(404);
+    }
+
+    @Test
+    void unknownProfileIs404() {
+        given().when().get("/api/v1/profiles/999888/job-orders").then().statusCode(404);
+    }
+
+    @Test
+    void summaryReturnsFullJobOrdersForOneCustomer() {
+        String loc = given().contentType("application/json")
+                .body("""
+                    { "customerId": %d, "jobDescription": "Summary Job", "specification": "Spec A" }
+                    """.formatted(customerId))
+                .when().post(base).then().statusCode(201).extract().header("Location");
+
+        given().contentType("application/json")
+                .body("{ \"materialId\": %d, \"qtyNeeded\": 5 }".formatted(materialId))
+                .when().post(loc + "/materials").then().statusCode(201);
+
+        given().when().get(base + "/summary?customerId=" + customerId)
+                .then().statusCode(200)
+                .body("find { it.jobDescription == 'Summary Job' }.specification", is("Spec A"))
+                .body("find { it.jobDescription == 'Summary Job' }.materials", hasSize(1));
     }
 }

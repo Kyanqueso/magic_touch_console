@@ -9,6 +9,7 @@ import com.magictouch.console.directory.api.dto.PartyRequest;
 import com.magictouch.console.directory.api.dto.PartyResponse;
 import com.magictouch.console.directory.data.Party;
 import com.magictouch.console.directory.data.PartyRepository;
+import com.magictouch.console.profiles.domain.ProfileGuard;
 import io.quarkus.hibernate.orm.panache.PanacheQuery;
 import io.quarkus.panache.common.Sort;
 import jakarta.transaction.Transactional;
@@ -31,8 +32,12 @@ public abstract class PartyService<E extends Party> {
     /** Lower-case noun for messages, e.g. {@code "customer"}. */
     protected abstract String noun();
 
+    // Verifies the corporate profile in the path exists.
+    protected abstract ProfileGuard profileGuard();
+
     public PageResponse<PartyResponse> list(long profileId, PageQuery page, String sort,
                                             String q, Scope scopeFilter, boolean archived) {
+        profileGuard().require(profileId);
         Sort s = SortSpec.parse(sort, SORTABLE, DEFAULT_SORT);
         PanacheQuery<E> query = repo().findVisible(profileId, archived, scopeFilter, q, s);
         long total = query.count();
@@ -71,6 +76,7 @@ public abstract class PartyService<E extends Party> {
     @Transactional
     public PartyResponse updateGlobal(long id, PartyRequest body) {
         E e = requireGlobal(id);
+        requireActive(e);
         applyGlobal(e, body);
         return PartyResponse.from(e);
     }
@@ -107,6 +113,7 @@ public abstract class PartyService<E extends Party> {
 
     @Transactional
     public PartyResponse create(long profileId, PartyRequest body) {
+        profileGuard().require(profileId);
         E e = newEntity();
         apply(e, body, profileId);
         repo().persist(e);
@@ -116,6 +123,7 @@ public abstract class PartyService<E extends Party> {
     @Transactional
     public PartyResponse update(long profileId, long id, PartyRequest body) {
         E e = require(profileId, id);
+        requireActive(e);
         apply(e, body, profileId);
         return PartyResponse.from(e);
     }
@@ -143,11 +151,19 @@ public abstract class PartyService<E extends Party> {
     }
 
     protected E require(long profileId, long id) {
+        profileGuard().require(profileId);
         E e = repo().findById(id);
         if (e == null || !visible(e, profileId)) {
             throw ApiException.notFound(capitalizedNoun());
         }
         return e;
+    }
+
+    // An archived record is read-only until it is restored.
+    private void requireActive(E e) {
+        if (e.archivedAt != null) {
+            throw ApiException.conflict("Restore the " + noun() + " before editing it.");
+        }
     }
 
     private boolean visible(E e, long profileId) {
@@ -158,13 +174,23 @@ public abstract class PartyService<E extends Party> {
     private void apply(E e, PartyRequest body, long profileId) {
         e.scope = body.scope();
         e.corporateProfileId = body.scope() == Scope.LOCAL ? profileId : null;
+        checkTin(e.corporateProfileId, body.tin(), e.id);
         applyFields(e, body);
     }
 
     private void applyGlobal(E e, PartyRequest body) {
         e.scope = Scope.GLOBAL;
         e.corporateProfileId = null;
+        checkTin(null, body.tin(), e.id);
         applyFields(e, body);
+    }
+
+    // A TIN identifies one taxpayer, so it cannot repeat within a profile scope.
+    private void checkTin(Long scopeProfileId, String tin, Long selfId) {
+        if (tin != null && !tin.isBlank()
+                && repo().tinTakenByAnother(scopeProfileId, tin, selfId)) {
+            throw ApiException.invalidField("tin", "Another " + noun() + " already uses this TIN.");
+        }
     }
 
     private void applyFields(E e, PartyRequest body) {

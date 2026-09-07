@@ -3,15 +3,13 @@ import { validateRows, countErrors } from '../lib/validate.js'
 
 // Inline "edit the whole table" mode — snapshot the visible rows into a draft,
 // edit cells, Ctrl+Z to undo, "Save Changes" persists, "Undo All" discards.
-// `onSave(draftRows, removedIds)` is an async callback that writes the changes;
-// the caller is expected to reload its data afterwards.
+// `onSave(changedRows, removedIds)` is an async callback that writes the changes;
+// it only receives rows that actually changed. The caller reloads afterwards.
 //
 // `validator(row, rows)` runs on every keystroke and returns { field: message }.
-// Save is blocked while anything is invalid, so the API is never asked to
-// reject something the table already knows is wrong.
+// Save is blocked while anything is invalid.
 export default function useTableEdit(onSave, validator) {
   const [editing, setEditing] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [draft, setDraft] = useState([])
   const [snapshot, setSnapshot] = useState([])
@@ -23,14 +21,15 @@ export default function useTableEdit(onSave, validator) {
   )
   const errorCount = countErrors(errors)
 
+  // A row differs from its snapshot on any field.
+  const rowChanged = (r) => {
+    const was = snapshot.find((s) => s.id === r.id)
+    return !was || Object.keys(r).some((k) => r[k] !== was[k])
+  }
+
   // Anything typed, or a row removed, counts as unsaved work.
   const dirty =
-    editing &&
-    (draft.length !== snapshot.length ||
-      draft.some((r) => {
-        const was = snapshot.find((s) => s.id === r.id)
-        return !was || Object.keys(r).some((k) => r[k] !== was[k])
-      }))
+    editing && (draft.length !== snapshot.length || draft.some(rowChanged))
 
   function start(rows) {
     setSnapshot(rows.map((r) => ({ ...r })))
@@ -51,9 +50,10 @@ export default function useTableEdit(onSave, validator) {
     const removedIds = snapshot
       .filter((s) => !draft.some((d) => d.id === s.id))
       .map((s) => s.id)
+    const changed = draft.filter(rowChanged)
     setSaving(true)
     try {
-      await onSave(draft, removedIds)
+      await onSave(changed, removedIds)
       cancel()
     } finally {
       setSaving(false)
@@ -91,7 +91,6 @@ export default function useTableEdit(onSave, validator) {
 
   return {
     editing,
-    loading,
     saving,
     draft,
     dirty,

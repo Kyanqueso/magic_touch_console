@@ -178,8 +178,8 @@ function toVoucherRow(r) {
   return {
     id: String(r.id),
     voucherNumber: r.number,
-    sInvId: r.supplierInvoiceId != null ? String(r.supplierInvoiceId) : '',
-    sInvNumber: r.supplierInvoiceNumber || '',
+    sInvId: r.salesInvoiceId != null ? String(r.salesInvoiceId) : '',
+    sInvNumber: r.salesInvoiceNumber || '',
     date: r.voucherDate || '',
     netAmount: r.netAmount != null ? Number(r.netAmount) : 0,
     paid: r.paid,
@@ -191,8 +191,8 @@ function toVoucher(v) {
   return {
     id: String(v.id),
     voucherNumber: v.number,
-    sInvId: v.supplierInvoiceId != null ? String(v.supplierInvoiceId) : '',
-    sInvNumber: v.supplierInvoiceNumber || '',
+    sInvId: v.salesInvoiceId != null ? String(v.salesInvoiceId) : '',
+    sInvNumber: v.salesInvoiceNumber || '',
     date: v.voucherDate || '',
     netAmount: v.netAmount != null ? Number(v.netAmount) : 0,
     paid: v.paid,
@@ -201,7 +201,7 @@ function toVoucher(v) {
 }
 
 const fromVoucher = (v) => ({
-  supplierInvoiceId: v.sInvId ? Number(v.sInvId) : null,
+  salesInvoiceId: v.sInvId ? Number(v.sInvId) : null,
   voucherDate: v.date || null,
   netAmount: v.netAmount === '' || v.netAmount == null ? 0 : Number(v.netAmount),
   paid: Boolean(v.paid),

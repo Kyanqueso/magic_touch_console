@@ -2,19 +2,32 @@ package com.magictouch.console.directory;
 
 import com.magictouch.console.AuthenticatedApiTest;
 import io.quarkus.test.junit.QuarkusTest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
 @QuarkusTest
 class CustomerResourceTest extends AuthenticatedApiTest {
 
-    private static final String BASE = "/api/v1/profiles/1/customers";
+    long profileId;
+    String base;
+
+    @BeforeEach
+    void createProfile() {
+        String loc = given().contentType("application/json")
+                .body("{ \"name\": \"Customer Test Co.\" }")
+                .when().post("/api/v1/profiles")
+                .then().statusCode(201).extract().header("Location");
+        profileId = Long.parseLong(loc.substring(loc.lastIndexOf('/') + 1));
+        base = "/api/v1/profiles/" + profileId + "/customers";
+    }
 
     @Test
     void createsAndListsAGlobalCustomer() {
@@ -28,7 +41,7 @@ class CustomerResourceTest extends AuthenticatedApiTest {
                       "tin": "118-902-334-000"
                     }
                     """)
-                .when().post(BASE)
+                .when().post(base)
                 .then()
                 .statusCode(201)
                 .header("Location", notNullValue())
@@ -38,7 +51,7 @@ class CustomerResourceTest extends AuthenticatedApiTest {
                 .body("archived", is(false));
 
         given()
-                .when().get(BASE + "?q=sunrise")
+                .when().get(base + "?q=sunrise")
                 .then()
                 .statusCode(200)
                 .body("total", greaterThanOrEqualTo(1))
@@ -52,10 +65,23 @@ class CustomerResourceTest extends AuthenticatedApiTest {
                 .body("""
                     { "scope": "GLOBAL", "name": "Bad TIN Co.", "tin": "12345" }
                     """)
-                .when().post(BASE)
+                .when().post(base)
                 .then()
                 .statusCode(400)
                 .body("error.code", is("VALIDATION"))
+                .body("error.fields.tin", notNullValue());
+    }
+
+    @Test
+    void rejectsADuplicateTin() {
+        given().contentType("application/json")
+                .body("{ \"scope\": \"GLOBAL\", \"name\": \"First TIN Co.\", \"tin\": \"111-222-333-000\" }")
+                .when().post(base).then().statusCode(201);
+
+        given().contentType("application/json")
+                .body("{ \"scope\": \"GLOBAL\", \"name\": \"Second TIN Co.\", \"tin\": \"111-222-333-000\" }")
+                .when().post(base)
+                .then().statusCode(400)
                 .body("error.fields.tin", notNullValue());
     }
 
@@ -66,7 +92,7 @@ class CustomerResourceTest extends AuthenticatedApiTest {
                 .body("""
                     { "scope": "GLOBAL", "name": "Lifecycle Co." }
                     """)
-                .when().post(BASE)
+                .when().post(base)
                 .then().statusCode(201)
                 .extract().header("Location");
 
@@ -75,6 +101,11 @@ class CustomerResourceTest extends AuthenticatedApiTest {
 
         given().when().post(location + "/archive").then().statusCode(204);
         given().when().get(location).then().statusCode(200).body("archived", is(true));
+
+        // an archived record is read-only
+        given().contentType("application/json")
+                .body("{ \"scope\": \"GLOBAL\", \"name\": \"Nope\" }")
+                .when().put(location).then().statusCode(409);
 
         given().when().post(location + "/restore").then().statusCode(204);
         given().when().get(location).then().statusCode(200).body("archived", is(false));
@@ -86,24 +117,18 @@ class CustomerResourceTest extends AuthenticatedApiTest {
 
     @Test
     void returns404ForUnknownId() {
-        given().when().get(BASE + "/999999")
+        given().when().get(base + "/999999")
                 .then().statusCode(404).body("error.code", is("NOT_FOUND"));
     }
 
     @Test
-    void createsALocalCustomerUnderARealProfile() {
-        // a Local customer needs an existing corporate profile to hang off
-        String profileLoc = given().contentType("application/json")
-                .body("""
-                    { "name": "MT Print Shop" }
-                    """)
-                .when().post("/api/v1/profiles")
-                .then().statusCode(201)
-                .extract().header("Location");
-        long profileId = Long.parseLong(profileLoc.substring(profileLoc.lastIndexOf('/') + 1));
+    void unknownProfileIs404() {
+        given().when().get("/api/v1/profiles/999888/customers")
+                .then().statusCode(404).body("error.code", is("NOT_FOUND"));
+    }
 
-        String base = "/api/v1/profiles/" + profileId + "/customers";
-
+    @Test
+    void createsALocalCustomerVisibleOnlyInItsProfile() {
         given().contentType("application/json")
                 .body("""
                     { "scope": "LOCAL", "name": "MT Local Print Client", "termsDays": 30 }
@@ -118,9 +143,15 @@ class CustomerResourceTest extends AuthenticatedApiTest {
                 .then().statusCode(200)
                 .body("items.name", hasItem("MT Local Print Client"));
 
-        // ...but not in another profile's Local view
-        given().when().get("/api/v1/profiles/999888/customers?scope=Local")
+        // ...but not in another real profile's Local view
+        String otherLoc = given().contentType("application/json")
+                .body("{ \"name\": \"Other Co.\" }")
+                .when().post("/api/v1/profiles")
+                .then().statusCode(201).extract().header("Location");
+        long otherId = Long.parseLong(otherLoc.substring(otherLoc.lastIndexOf('/') + 1));
+
+        given().when().get("/api/v1/profiles/" + otherId + "/customers?scope=Local")
                 .then().statusCode(200)
-                .body("items.name", org.hamcrest.Matchers.not(hasItem("MT Local Print Client")));
+                .body("items.name", not(hasItem("MT Local Print Client")));
     }
 }

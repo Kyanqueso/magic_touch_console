@@ -1,5 +1,6 @@
-// Money: ₱1,234.50 style (no thousands separator, 2 decimals).
-export const peso = (n) => `₱${Number(n || 0).toFixed(2)}`
+// Money: ₱1,234.50 — thousands separators, always two decimals.
+export const peso = (n) =>
+  `₱${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 // Dates everywhere render as "Jun 8, 2025". Accepts an ISO string
 // ("2025-06-08"), a Date, or empty.

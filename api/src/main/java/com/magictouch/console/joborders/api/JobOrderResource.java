@@ -23,6 +23,8 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
+import java.util.List;
+
 @Path("/api/v1/profiles/{profileId}/job-orders")
 @Produces(MediaType.APPLICATION_JSON)
 @Tag(name = "Job Orders")
@@ -44,6 +46,13 @@ public class JobOrderResource {
             @QueryParam("tab") @DefaultValue("active") String tab) {
         return service.list(profileId, PageQuery.of(page, size), sort, q,
                 "archive".equalsIgnoreCase(tab));
+    }
+
+    @GET
+    @Path("summary")
+    public List<JobOrderResponse> summary(@PathParam("profileId") long profileId,
+                                          @QueryParam("customerId") long customerId) {
+        return service.summaryFor(profileId, customerId);
     }
 
     @GET

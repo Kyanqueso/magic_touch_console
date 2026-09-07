@@ -18,9 +18,11 @@ import com.magictouch.console.joborders.data.JobOrderRepository;
 import com.magictouch.console.joborders.data.JobOrderStatus;
 import com.magictouch.console.materials.data.Material;
 import com.magictouch.console.materials.data.MaterialRepository;
+import com.magictouch.console.profiles.domain.ProfileGuard;
 import io.quarkus.hibernate.orm.panache.PanacheQuery;
 import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
 
 import java.time.OffsetDateTime;
@@ -38,18 +40,21 @@ public class JobOrderService {
     private final JobOrderRepository jobOrders;
     private final CustomerRepository customers; // cross-module FK target
     private final MaterialRepository materials;  // cross-module FK target
+    private final ProfileGuard profileGuard;
 
     public JobOrderService(JobOrderRepository jobOrders, CustomerRepository customers,
-                           MaterialRepository materials) {
+                           MaterialRepository materials, ProfileGuard profileGuard) {
         this.jobOrders = jobOrders;
         this.customers = customers;
         this.materials = materials;
+        this.profileGuard = profileGuard;
     }
 
     // --- job orders -------------------------------------------------------
 
     public PageResponse<JobOrderSummaryRow> list(long profileId, PageQuery page, String sort,
                                                  String q, boolean archived) {
+        profileGuard.require(profileId);
         Sort s = SortSpec.parse(sort, SORTABLE, DEFAULT_SORT);
         PanacheQuery<JobOrder> query = jobOrders.search(profileId, archived, q, s);
         long total = query.count();
@@ -62,8 +67,16 @@ public class JobOrderService {
         return JobOrderResponse.from(require(profileId, id));
     }
 
+    // Full job orders for one customer, in a single query, for the summary screen.
+    public List<JobOrderResponse> summaryFor(long profileId, long customerId) {
+        profileGuard.require(profileId);
+        return jobOrders.listFullByCustomer(profileId, customerId).stream()
+                .map(JobOrderResponse::from).toList();
+    }
+
     @Transactional
     public JobOrderResponse create(long profileId, JobOrderRequest body) {
+        profileGuard.require(profileId);
         checkDates(body);
         JobOrder j = new JobOrder();
         j.corporateProfileId = profileId;
@@ -77,6 +90,7 @@ public class JobOrderService {
     @Transactional
     public JobOrderResponse update(long profileId, long id, JobOrderRequest body) {
         JobOrder j = require(profileId, id);
+        requireActive(j);
         requireOpen(j);
         checkDates(body);
         j.customer = resolveCustomer(profileId, body.customerId());
@@ -87,6 +101,7 @@ public class JobOrderService {
     @Transactional
     public JobOrderResponse close(long profileId, long id) {
         JobOrder j = require(profileId, id);
+        requireActive(j);
         j.status = JobOrderStatus.CLOSED;
         return JobOrderResponse.from(j);
     }
@@ -94,6 +109,7 @@ public class JobOrderService {
     @Transactional
     public JobOrderResponse reopen(long profileId, long id) {
         JobOrder j = require(profileId, id);
+        requireActive(j);
         j.status = JobOrderStatus.OPEN;
         return JobOrderResponse.from(j);
     }
@@ -129,7 +145,10 @@ public class JobOrderService {
     @Transactional
     public JobOrderMaterialResponse addMaterial(long profileId, long jobId, JobOrderMaterialRequest body) {
         JobOrder j = require(profileId, jobId);
+        requireActive(j);
         requireOpen(j);
+        // Lock and reload the parent so two concurrent adds cannot pick the same line_no.
+        jobOrders.getEntityManager().refresh(j, LockModeType.PESSIMISTIC_WRITE);
         JobOrderMaterial m = new JobOrderMaterial();
         m.jobOrder = j;
         m.lineNo = j.nextLineNo();
@@ -143,6 +162,7 @@ public class JobOrderService {
     public JobOrderMaterialResponse updateMaterial(long profileId, long jobId, long materialLineId,
                                                    JobOrderMaterialRequest body) {
         JobOrder j = require(profileId, jobId);
+        requireActive(j);
         requireOpen(j);
         JobOrderMaterial m = j.materials.stream()
                 .filter(x -> x.id.equals(materialLineId)).findFirst()
@@ -154,6 +174,7 @@ public class JobOrderService {
     @Transactional
     public void removeMaterial(long profileId, long jobId, long materialLineId) {
         JobOrder j = require(profileId, jobId);
+        requireActive(j);
         requireOpen(j);
         boolean removed = j.materials.removeIf(x -> x.id.equals(materialLineId));
         if (!removed) {
@@ -164,6 +185,7 @@ public class JobOrderService {
     // --- helpers -------------------------------------------------------
 
     private JobOrder require(long profileId, long id) {
+        profileGuard.require(profileId);
         JobOrder j = jobOrders.findById(id);
         if (j == null || !Objects.equals(j.corporateProfileId, profileId)) {
             throw ApiException.notFound("Job order");
@@ -174,6 +196,13 @@ public class JobOrderService {
     private void requireOpen(JobOrder j) {
         if (j.isClosed()) {
             throw ApiException.conflict("Reopen the job order before editing it.");
+        }
+    }
+
+    // An archived job order is read-only until it is restored.
+    private void requireActive(JobOrder j) {
+        if (j.archivedAt != null) {
+            throw ApiException.conflict("Restore the job order before editing it.");
         }
     }
 

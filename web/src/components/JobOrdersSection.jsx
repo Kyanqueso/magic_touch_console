@@ -284,6 +284,12 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
         onArchive={() =>
           setPending({ action: 'archive', items: [toItem(selectedJob)], from: 'detail' })
         }
+        onRestore={() =>
+          setPending({ action: 'restore', items: [toItem(selectedJob)], from: 'detail' })
+        }
+        onDelete={() =>
+          setPending({ action: 'delete', items: [toItem(selectedJob)], from: 'detail' })
+        }
         onError={(e) =>
           setAlert({ variant: 'danger', title: 'Save failed', message: errMessage(e) })
         }

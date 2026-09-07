@@ -2,6 +2,7 @@ package com.magictouch.console.directory;
 
 import com.magictouch.console.AuthenticatedApiTest;
 import io.quarkus.test.junit.QuarkusTest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static io.restassured.RestAssured.given;
@@ -13,7 +14,16 @@ import static org.hamcrest.Matchers.notNullValue;
 @QuarkusTest
 class SupplierResourceTest extends AuthenticatedApiTest {
 
-    private static final String BASE = "/api/v1/profiles/1/suppliers";
+    String base;
+
+    @BeforeEach
+    void createProfile() {
+        String loc = given().contentType("application/json")
+                .body("{ \"name\": \"Supplier Test Co.\" }")
+                .when().post("/api/v1/profiles")
+                .then().statusCode(201).extract().header("Location");
+        base = "/api/v1/profiles/" + loc.substring(loc.lastIndexOf('/') + 1) + "/suppliers";
+    }
 
     @Test
     void createsAndListsAGlobalSupplier() {
@@ -28,7 +38,7 @@ class SupplierResourceTest extends AuthenticatedApiTest {
                       "taxType": "ZERO_RATED"
                     }
                     """)
-                .when().post(BASE)
+                .when().post(base)
                 .then()
                 .statusCode(201)
                 .body("name", is("Kitagawa Industrial Supply Co."))
@@ -36,7 +46,7 @@ class SupplierResourceTest extends AuthenticatedApiTest {
                 .body("taxType", is("ZERO_RATED"));
 
         given()
-                .when().get(BASE + "?sort=-createdAt&size=5")
+                .when().get(base + "?sort=-createdAt&size=5")
                 .then()
                 .statusCode(200)
                 .body("total", greaterThanOrEqualTo(1))
@@ -50,7 +60,7 @@ class SupplierResourceTest extends AuthenticatedApiTest {
                 .body("""
                     { "scope": "GLOBAL", "name": "  " }
                     """)
-                .when().post(BASE)
+                .when().post(base)
                 .then()
                 .statusCode(400)
                 .body("error.code", is("VALIDATION"))

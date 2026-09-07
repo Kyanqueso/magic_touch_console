@@ -13,9 +13,11 @@ import com.magictouch.console.profiles.api.dto.CorporateProfileResponse;
 import com.magictouch.console.profiles.api.dto.CorporateProfileSummary;
 import com.magictouch.console.profiles.api.dto.RegistrationInput;
 import com.magictouch.console.profiles.data.BusinessRegistration;
+import com.magictouch.console.profiles.data.BusinessRegistrationRepository;
 import com.magictouch.console.profiles.data.CorporateProfile;
 import com.magictouch.console.profiles.data.CorporateProfileRepository;
 import com.magictouch.console.profiles.data.FilingType;
+import com.magictouch.console.profiles.data.RegistrationBody;
 import io.quarkus.hibernate.orm.panache.PanacheQuery;
 import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -23,7 +25,10 @@ import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -35,6 +40,7 @@ public class CorporateProfileService {
     private static final String JOB_ORDERS_MODULE = "job_orders";
 
     private final CorporateProfileRepository repo;
+    private final BusinessRegistrationRepository registrations;
     private final EntityManager em;
     // Cross-module, for the list-card tags only.
     private final JobOrderRepository jobOrders;
@@ -42,11 +48,13 @@ public class CorporateProfileService {
     private final SupplierRepository suppliers;
     private final CorporateProfileModuleRepository profileModules;
 
-    public CorporateProfileService(CorporateProfileRepository repo, EntityManager em,
+    public CorporateProfileService(CorporateProfileRepository repo,
+                                   BusinessRegistrationRepository registrations, EntityManager em,
                                    JobOrderRepository jobOrders, CustomerRepository customers,
                                    SupplierRepository suppliers,
                                    CorporateProfileModuleRepository profileModules) {
         this.repo = repo;
+        this.registrations = registrations;
         this.em = em;
         this.jobOrders = jobOrders;
         this.customers = customers;
@@ -125,8 +133,65 @@ public class CorporateProfileService {
         return p;
     }
 
+    // Government IDs and agency numbers are unique; WTAX codes and filing types must not repeat.
+    private void validate(CorporateProfileRequest b, Long selfId) {
+        Map<String, String> errs = new LinkedHashMap<>();
+        checkGovId(errs, "tin", b.tin(), selfId, "TIN");
+        checkGovId(errs, "sss", b.sss(), selfId, "SSS");
+        checkGovId(errs, "phic", b.phic(), selfId, "PHIC");
+        checkGovId(errs, "hdmf", b.hdmf(), selfId, "HDMF");
+
+        String a1 = trimToNull(b.wtaxAtc1());
+        String a2 = trimToNull(b.wtaxAtc2());
+        if (a1 != null && a1.equalsIgnoreCase(a2)) {
+            errs.put("wtaxAtc2", "WTAX ATC 1 and 2 must be different.");
+        }
+
+        if (b.filingTypes() != null) {
+            List<String> cleaned = b.filingTypes().stream()
+                    .filter(v -> v != null && !v.isBlank()).map(String::trim).toList();
+            long distinct = cleaned.stream().map(v -> v.toLowerCase(Locale.ROOT)).distinct().count();
+            if (distinct != cleaned.size()) {
+                errs.put("filingTypes", "Filing tax types must all be different.");
+            }
+        }
+
+        if (b.registrations() != null) {
+            Set<RegistrationBody> seenBodies = new HashSet<>();
+            for (RegistrationInput in : b.registrations()) {
+                if (in.body() != null && !seenBodies.add(in.body())) {
+                    errs.put("registrations", "Each agency can be registered only once.");
+                }
+                if (in.body() != null && in.registrationNo() != null
+                        && registrations.numberTakenByAnother(in.body(), in.registrationNo(), selfId)) {
+                    errs.put("registrations", in.body() + " registration number is already in use.");
+                }
+            }
+        }
+
+        if (!errs.isEmpty()) {
+            throw ApiException.invalidFields(errs);
+        }
+    }
+
+    private void checkGovId(Map<String, String> errs, String field, String value, Long selfId, String label) {
+        String v = trimToNull(value);
+        if (v != null && repo.govIdTakenByAnother(field, v, selfId)) {
+            errs.put(field, "Another corporate profile already uses this " + label + ".");
+        }
+    }
+
+    private static String trimToNull(String s) {
+        if (s == null) {
+            return null;
+        }
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
     private CorporateProfileResponse save(CorporateProfile p, CorporateProfileRequest body) {
         boolean existing = p.id != null;
+        validate(body, p.id);
 
         p.name = body.name().trim();
         p.address = body.address();

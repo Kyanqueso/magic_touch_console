@@ -31,6 +31,13 @@ public class JobOrderRepository implements PanacheRepository<JobOrder> {
         return find(q.toString(), sort, params);
     }
 
+    // Every active job order for one customer, with material lines fetched, in one query.
+    public List<JobOrder> listFullByCustomer(long profileId, long customerId) {
+        return list("select distinct j from JobOrder j left join fetch j.materials "
+                + "where j.corporateProfileId = ?1 and j.customer.id = ?2 and j.archivedAt is null "
+                + "order by j.id desc", profileId, customerId);
+    }
+
     /**
      * Active job orders per profile, for the corporate-profile cards. One
      * grouped query for the whole page rather than a count per card.

@@ -35,3 +35,17 @@ export const WTAX_ATC = [
   'WC158 (1%)',
   'WC160 (2%)',
 ]
+
+// "WI011 (10%)" <-> code "WI011" + rate 10. Shared by the party and
+// corporate-profile forms so they can't drift apart.
+export function splitAtc(label) {
+  if (!label) return { code: null, rate: null }
+  const m = String(label).match(/^\s*([A-Za-z0-9]+)\s*(?:\(\s*([\d.]+)\s*%\s*\))?\s*$/)
+  if (!m) return { code: String(label).trim() || null, rate: null }
+  return { code: m[1], rate: m[2] != null ? Number(m[2]) : null }
+}
+
+export function joinAtc(code, rate) {
+  if (!code) return ''
+  return rate != null ? `${code} (${Number(rate)}%)` : code
+}

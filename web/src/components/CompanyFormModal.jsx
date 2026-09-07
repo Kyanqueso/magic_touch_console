@@ -70,8 +70,13 @@ export default function CompanyFormModal({
 
   async function submit(e) {
     e.preventDefault()
-    if (!form.name.trim()) {
-      setErrors({ name: 'Required.' })
+    const errs = {}
+    if (!form.name.trim()) errs.name = 'Required.'
+    if (form.tin && !/^\d{3}-\d{3}-\d{3}-\d{3}$/.test(form.tin)) {
+      errs.tin = 'Must look like 000-000-000-000.'
+    }
+    if (Object.keys(errs).length) {
+      setErrors(errs)
       return
     }
     setLoading(true)
@@ -114,6 +119,7 @@ export default function CompanyFormModal({
           placeholder="000-000-000-000"
           value={form.tin}
           onChange={(e) => set('tin', maskTIN(e.target.value))}
+          error={errors.tin}
           disabled={loading}
         />
 

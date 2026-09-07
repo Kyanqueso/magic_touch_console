@@ -254,13 +254,17 @@ export default function ChartOfAccountsPage() {
 
   async function saveChanges() {
     if (errorCount > 0) return
-    const snapshot = accounts.filter((a) => a.categoryId === editingId)
     const removedIds = snapshot
       .filter((s) => !draft.some((d) => d.id === s.id))
       .map((s) => s.id)
+    // Only write rows that actually changed.
+    const changed = draft.filter((r) => {
+      const was = snapshot.find((s) => s.id === r.id)
+      return !was || Object.keys(r).some((k) => r[k] !== was[k])
+    })
     try {
       await Promise.all([
-        ...draft.map((r) => updateAccount(r.id, r)),
+        ...changed.map((r) => updateAccount(r.id, r)),
         ...removedIds.map((id) => archiveAccount(id)),
       ])
       setAlert({ variant: 'success', title: 'Changes saved.' })

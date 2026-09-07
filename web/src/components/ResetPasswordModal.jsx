@@ -11,7 +11,7 @@ const MIN_PASSWORD = 8
 
 // Supabase recovery: email a code, verify it for a session, then set the password.
 // Also how a new user sets their first one. Needs the Supabase "Reset Password"
-// template to emit {{ .Token }} - see api/supabase-email-setup.md.
+// template to emit {{ .Token }}.
 
 async function requestOtp(email) {
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim())

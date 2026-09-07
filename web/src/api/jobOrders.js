@@ -168,6 +168,10 @@ export async function listJobOrders(profileId, { tab = 'active', q = '', sort = 
 }
 
 export const getJobOrder = (pid, id) => api.get(`${jobBase(pid)}/${id}`).then(toJob)
+
+// Every active job order for one customer, materials included, in a single call.
+export const getJobOrderSummary = (pid, customerId) =>
+  api.get(`${jobBase(pid)}/summary${qs({ customerId })}`).then((rows) => rows.map(toJob))
 export const createJobOrder = (pid, v) => api.post(jobBase(pid), fromJob(v)).then(toJob)
 export const updateJobOrder = (pid, id, v) => api.put(`${jobBase(pid)}/${id}`, fromJob(v)).then(toJob)
 export const closeJobOrder = (pid, id) => api.post(`${jobBase(pid)}/${id}/close`).then(toJob)

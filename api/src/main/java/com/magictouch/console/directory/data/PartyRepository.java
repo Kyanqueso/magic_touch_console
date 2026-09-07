@@ -89,4 +89,22 @@ public abstract class PartyRepository<E extends Party> implements PanacheReposit
     public long activeGlobalCount() {
         return count("scope = ?1 and archivedAt is null", Scope.GLOBAL);
     }
+
+    // True when another active row in the same profile scope already holds this TIN.
+    public boolean tinTakenByAnother(Long scopeProfileId, String tin, Long selfId) {
+        StringBuilder q = new StringBuilder("archivedAt is null and tin = :tin");
+        Map<String, Object> p = new HashMap<>();
+        p.put("tin", tin.trim());
+        if (scopeProfileId == null) {
+            q.append(" and corporateProfileId is null");
+        } else {
+            q.append(" and corporateProfileId = :pid");
+            p.put("pid", scopeProfileId);
+        }
+        if (selfId != null) {
+            q.append(" and id <> :self");
+            p.put("self", selfId);
+        }
+        return count(q.toString(), p) > 0;
+    }
 }

@@ -67,7 +67,7 @@ class CorporateProfileResourceTest extends AuthenticatedApiTest {
                       "registrations": [
                         { "body": "DTI", "registrationNo": "2356744235" }
                       ],
-                      "filingTypes": ["1601C", "1601C", "2550M"]
+                      "filingTypes": ["1601C", "2550M"]
                     }
                     """)
                 .when().put(location)
@@ -75,6 +75,20 @@ class CorporateProfileResourceTest extends AuthenticatedApiTest {
                 .body("registrations", hasSize(1))
                 .body("filingTypes", hasSize(2))
                 .body("filingTypes", hasItem("2550M"));
+
+        // duplicate filing types are rejected
+        given()
+                .contentType("application/json")
+                .body("""
+                    {
+                      "name": "Northgate Trading Corporation",
+                      "tin": "123-456-789-000",
+                      "filingTypes": ["1601C", "1601C"]
+                    }
+                    """)
+                .when().put(location)
+                .then().statusCode(400)
+                .body("error.fields.filingTypes", notNullValue());
     }
 
     @Test
@@ -229,5 +243,27 @@ class CorporateProfileResourceTest extends AuthenticatedApiTest {
     void unknownIdIs404() {
         given().when().get(BASE + "/999999").then().statusCode(404)
                 .body("error.code", is("NOT_FOUND"));
+    }
+
+    @Test
+    void rejectsDuplicateGovernmentId() {
+        given().contentType("application/json")
+                .body("{ \"name\": \"First TIN Corp.\", \"tin\": \"321-654-987-000\" }")
+                .when().post(BASE).then().statusCode(201);
+
+        given().contentType("application/json")
+                .body("{ \"name\": \"Second TIN Corp.\", \"tin\": \"321-654-987-000\" }")
+                .when().post(BASE)
+                .then().statusCode(400)
+                .body("error.fields.tin", notNullValue());
+    }
+
+    @Test
+    void rejectsIdenticalWtaxAtcCodes() {
+        given().contentType("application/json")
+                .body("{ \"name\": \"Same ATC Corp.\", \"wtaxAtc1\": \"WI011\", \"wtaxAtc2\": \"WI011\" }")
+                .when().post(BASE)
+                .then().statusCode(400)
+                .body("error.fields.wtaxAtc2", notNullValue());
     }
 }

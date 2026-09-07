@@ -99,9 +99,12 @@ export default function JobOrderDetail({
   onClose,
   onReopen,
   onArchive,
+  onRestore,
+  onDelete,
   onError,
 }) {
   const closed = job.status === 'Closed'
+  const archived = job.archived
 
   const [showSummary, setShowSummary] = useState(false)
 
@@ -141,9 +144,10 @@ export default function JobOrderDetail({
   const view = editing ? draft : job
   const materials = view.materials || []
   const filledCount = materials.filter((m) => m.materialId).length
-  const editable = editing && !closed
+  const editable = editing && !closed && !archived
 
   function startEdit() {
+    if (archived) return
     setDraft(job)
     setHistory([])
     setEditing(true)
@@ -350,7 +354,18 @@ export default function JobOrderDetail({
                 <BarChart3 className="h-4 w-4" />
                 View Summary
               </Button>
-              {closed ? (
+              {archived ? (
+                <>
+                  <Button variant="warning" size="sm" onClick={onRestore}>
+                    <LockOpen className="h-4 w-4" />
+                    Restore
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={onDelete}>
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </Button>
+                </>
+              ) : closed ? (
                 <>
                   <Button variant="info" size="sm" onClick={onReopen}>
                     <LockOpen className="h-4 w-4" />

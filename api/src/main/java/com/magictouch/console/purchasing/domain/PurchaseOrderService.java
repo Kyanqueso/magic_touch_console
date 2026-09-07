@@ -6,17 +6,19 @@ import com.magictouch.console.common.page.PageResponse;
 import com.magictouch.console.common.page.SortSpec;
 import com.magictouch.console.materials.data.Material;
 import com.magictouch.console.materials.data.MaterialRepository;
+import com.magictouch.console.profiles.domain.ProfileGuard;
 import com.magictouch.console.purchasing.api.dto.PurchaseOrderItemRequest;
 import com.magictouch.console.purchasing.api.dto.PurchaseOrderItemResponse;
 import com.magictouch.console.purchasing.api.dto.PurchaseOrderRequest;
 import com.magictouch.console.purchasing.api.dto.PurchaseOrderResponse;
 import com.magictouch.console.purchasing.api.dto.PurchaseOrderSummaryRow;
+import com.magictouch.console.purchasing.data.LineSummary;
 import com.magictouch.console.purchasing.data.PurchaseOrder;
 import com.magictouch.console.purchasing.data.PurchaseOrderItem;
 import com.magictouch.console.purchasing.data.PurchaseOrderRepository;
-import io.quarkus.hibernate.orm.panache.PanacheQuery;
 import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
 
 import java.time.OffsetDateTime;
@@ -34,22 +36,28 @@ public class PurchaseOrderService {
     private final PurchaseOrderRepository repo;
     private final MaterialRepository materials;
     private final PurchasingLookups lookups;
+    private final ProfileGuard profileGuard;
 
     public PurchaseOrderService(PurchaseOrderRepository repo, MaterialRepository materials,
-                                PurchasingLookups lookups) {
+                                PurchasingLookups lookups, ProfileGuard profileGuard) {
         this.repo = repo;
         this.materials = materials;
         this.lookups = lookups;
+        this.profileGuard = profileGuard;
     }
 
     public PageResponse<PurchaseOrderSummaryRow> list(long profileId, long supplierId, PageQuery page,
                                                       String sort, String q, boolean archived) {
+        profileGuard.require(profileId);
         lookups.requireUsableSupplier(profileId, supplierId);
         Sort s = SortSpec.parse(sort, SORTABLE, DEFAULT_SORT);
-        PanacheQuery<PurchaseOrder> query = repo.search(profileId, supplierId, archived, q, s);
+        var query = repo.search(profileId, supplierId, archived, q, s);
         long total = query.count();
-        List<PurchaseOrderSummaryRow> items = query.page(page.index(), page.size())
-                .list().stream().map(PurchaseOrderSummaryRow::from).toList();
+        List<PurchaseOrder> rows = query.page(page.index(), page.size()).list();
+        Map<Long, LineSummary> sums = repo.itemSummaries(rows.stream().map(r -> r.id).toList());
+        List<PurchaseOrderSummaryRow> items = rows.stream()
+                .map(r -> PurchaseOrderSummaryRow.from(r, sums.getOrDefault(r.id, LineSummary.EMPTY)))
+                .toList();
         return PageResponse.of(items, page, total);
     }
 
@@ -59,6 +67,7 @@ public class PurchaseOrderService {
 
     @Transactional
     public PurchaseOrderResponse create(long profileId, long supplierId, PurchaseOrderRequest body) {
+        profileGuard.require(profileId);
         PurchaseOrder po = new PurchaseOrder();
         po.corporateProfileId = profileId;
         po.supplier = lookups.requireUsableSupplier(profileId, supplierId);
@@ -70,6 +79,7 @@ public class PurchaseOrderService {
     @Transactional
     public PurchaseOrderResponse update(long profileId, long supplierId, long id, PurchaseOrderRequest body) {
         PurchaseOrder po = require(profileId, supplierId, id);
+        requireActive(po);
         apply(po, body);
         return PurchaseOrderResponse.from(po);
     }
@@ -107,6 +117,9 @@ public class PurchaseOrderService {
     public PurchaseOrderItemResponse addItem(long profileId, long supplierId, long poId,
                                              PurchaseOrderItemRequest body) {
         PurchaseOrder po = require(profileId, supplierId, poId);
+        requireActive(po);
+        // Lock and reload the parent so two concurrent adds cannot pick the same line_no.
+        repo.getEntityManager().refresh(po, LockModeType.PESSIMISTIC_WRITE);
         if (po.items.size() >= MAX_ITEMS) {
             throw ApiException.conflict("A purchase order can hold at most " + MAX_ITEMS + " lines.");
         }
@@ -123,6 +136,7 @@ public class PurchaseOrderService {
     public PurchaseOrderItemResponse updateItem(long profileId, long supplierId, long poId, long itemId,
                                                 PurchaseOrderItemRequest body) {
         PurchaseOrder po = require(profileId, supplierId, poId);
+        requireActive(po);
         PurchaseOrderItem item = po.items.stream()
                 .filter(i -> i.id.equals(itemId)).findFirst()
                 .orElseThrow(() -> ApiException.notFound("Line item"));
@@ -133,6 +147,7 @@ public class PurchaseOrderService {
     @Transactional
     public void removeItem(long profileId, long supplierId, long poId, long itemId) {
         PurchaseOrder po = require(profileId, supplierId, poId);
+        requireActive(po);
         if (!po.items.removeIf(i -> i.id.equals(itemId))) {
             throw ApiException.notFound("Line item");
         }
@@ -141,12 +156,20 @@ public class PurchaseOrderService {
     // --- helpers ---------------------------------------------------
 
     private PurchaseOrder require(long profileId, long supplierId, long id) {
+        profileGuard.require(profileId);
         PurchaseOrder po = repo.findById(id);
         if (po == null || !Objects.equals(po.corporateProfileId, profileId)
                 || !Objects.equals(po.supplier.id, supplierId)) {
             throw ApiException.notFound("Purchase order");
         }
         return po;
+    }
+
+    // An archived purchase order is read-only until it is restored.
+    private void requireActive(PurchaseOrder po) {
+        if (po.archivedAt != null) {
+            throw ApiException.conflict("Restore the purchase order before editing it.");
+        }
     }
 
     private void apply(PurchaseOrder po, PurchaseOrderRequest b) {

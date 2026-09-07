@@ -7,7 +7,7 @@ import Loading from './Loading.jsx'
 import Pagination from './Pagination.jsx'
 import { formatDate } from '../lib/format.js'
 import { printDocument } from '../lib/print.js'
-import { listJobOrders, getJobOrder } from '../api/jobOrders.js'
+import { getJobOrderSummary } from '../api/jobOrders.js'
 
 const DETAIL_COLUMNS = [
   ['dateOrdered', 'Date Created', 'date'],
@@ -53,13 +53,7 @@ export default function JobOrderSummary({ profileId, customerId, customerName, d
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    listJobOrders(profileId, { size: 500 })
-      .then((res) => {
-        const mine = res.items.filter(
-          (r) => String(r.customerId) === String(customerId) && !r.archived,
-        )
-        return Promise.all(mine.map((r) => getJobOrder(profileId, r.id)))
-      })
+    getJobOrderSummary(profileId, customerId)
       .then((full) => !cancelled && setOrders(full))
       .catch(() => !cancelled && setOrders([]))
       .finally(() => !cancelled && setLoading(false))

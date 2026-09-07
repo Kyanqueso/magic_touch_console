@@ -1,4 +1,5 @@
 import { api, qs } from './http.js'
+import { joinAtc, splitAtc } from '../lib/options.js'
 
 // ---------------------------------------------------------------------------
 // Shape mapping between the backend (normalized) and what the screens expect.
@@ -45,8 +46,8 @@ function toDetail(row, jobOrdersEnabled) {
       secNo: sec.registrationNo || '',
       secRegistered: sec.registeredAt || '',
       secExpired: sec.expiresAt || '',
-      wtax1: row.wtaxAtc1 || '',
-      wtax2: row.wtaxAtc2 || '',
+      wtax1: joinAtc(row.wtaxAtc1, row.wtaxAtc1Rate),
+      wtax2: joinAtc(row.wtaxAtc2, row.wtaxAtc2Rate),
       filingTaxTypes: row.filingTypes || [],
     },
   }
@@ -71,6 +72,8 @@ function fromForm(data) {
       expiresAt: d.secExpired || null,
     })
   }
+  const a1 = splitAtc(d.wtax1)
+  const a2 = splitAtc(d.wtax2)
   return {
     name: data.name,
     address: data.address || null,
@@ -78,8 +81,10 @@ function fromForm(data) {
     sss: d.sss || null,
     phic: d.phic || null,
     hdmf: d.hdmf || null,
-    wtaxAtc1: d.wtax1 || null,
-    wtaxAtc2: d.wtax2 || null,
+    wtaxAtc1: a1.code,
+    wtaxAtc1Rate: a1.rate,
+    wtaxAtc2: a2.code,
+    wtaxAtc2Rate: a2.rate,
     registrations,
     filingTypes: (d.filingTaxTypes || []).filter(Boolean),
   }

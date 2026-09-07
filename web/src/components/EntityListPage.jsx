@@ -4,7 +4,6 @@ import {
   Building2,
   CalendarDays,
   Fingerprint,
-  Loader2,
   Pencil,
   Percent,
   Plus,
@@ -284,14 +283,10 @@ export default function EntityListPage({
               <button
                 type="button"
                 onClick={() => edit.start(pageRows)}
-                disabled={edit.loading || pageRows.length === 0}
+                disabled={pageRows.length === 0}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-info px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-info-hover disabled:opacity-60"
               >
-                {edit.loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Pencil className="h-4 w-4" />
-                )}
+                <Pencil className="h-4 w-4" />
                 Edit Table
               </button>
             ))}

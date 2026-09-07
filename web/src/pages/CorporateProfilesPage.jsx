@@ -119,30 +119,33 @@ export default function CorporateProfilesPage() {
     reload()
   }
 
-  const profileNav = selected
-    ? [
-        { label: 'Corporate Profiles', onClick: closeProfile },
-        {
-          label: 'Customers',
-          onClick: () => setProfileSection('customers'),
-          active: profileSection === 'customers',
-        },
-        {
-          label: 'Suppliers',
-          onClick: () => setProfileSection('suppliers'),
-          active: profileSection === 'suppliers',
-        },
-        ...(selected.jobOrdersEnabled
-          ? [
-              {
-                label: 'Job Orders',
-                onClick: () => setProfileSection('job-orders'),
-                active: profileSection === 'job-orders',
-              },
-            ]
-          : []),
-      ]
-    : null
+  // An archived profile shows only the breadcrumb — its sections are read-only elsewhere.
+  const profileNav = !selected
+    ? null
+    : selected.archived
+      ? [{ label: 'Corporate Profiles', onClick: closeProfile }]
+      : [
+          { label: 'Corporate Profiles', onClick: closeProfile },
+          {
+            label: 'Customers',
+            onClick: () => setProfileSection('customers'),
+            active: profileSection === 'customers',
+          },
+          {
+            label: 'Suppliers',
+            onClick: () => setProfileSection('suppliers'),
+            active: profileSection === 'suppliers',
+          },
+          ...(selected.jobOrdersEnabled
+            ? [
+                {
+                  label: 'Job Orders',
+                  onClick: () => setProfileSection('job-orders'),
+                  active: profileSection === 'job-orders',
+                },
+              ]
+            : []),
+        ]
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const safePage = Math.min(page, pageCount)
@@ -210,6 +213,7 @@ export default function CorporateProfilesPage() {
   async function handleDelete(profile) {
     try {
       await deleteProfile(profile.id)
+      setSelectedId(null)
       setAlert({
         variant: 'neutral',
         title: 'Delete Successful',
@@ -248,6 +252,8 @@ export default function CorporateProfilesPage() {
           onExitSection={() => setProfileSection('details')}
           onSave={(data) => handleSaveDetails(selected.id, data)}
           onArchive={() => setArchiveTarget(selected)}
+          onRestore={() => handleRestore(selected).then(closeProfile)}
+          onDelete={() => setDeleteTarget(selected)}
         />
        ) : (
         <>

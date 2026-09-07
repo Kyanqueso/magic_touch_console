@@ -4,11 +4,12 @@ import com.magictouch.console.common.error.ApiException;
 import com.magictouch.console.common.page.PageQuery;
 import com.magictouch.console.common.page.PageResponse;
 import com.magictouch.console.common.page.SortSpec;
+import com.magictouch.console.profiles.domain.ProfileGuard;
 import com.magictouch.console.purchasing.api.dto.VoucherRequest;
 import com.magictouch.console.purchasing.api.dto.VoucherResponse;
 import com.magictouch.console.purchasing.api.dto.VoucherSummaryRow;
-import com.magictouch.console.purchasing.data.SupplierInvoice;
-import com.magictouch.console.purchasing.data.SupplierInvoiceRepository;
+import com.magictouch.console.purchasing.data.SalesInvoice;
+import com.magictouch.console.purchasing.data.SalesInvoiceRepository;
 import com.magictouch.console.purchasing.data.Voucher;
 import com.magictouch.console.purchasing.data.VoucherRepository;
 import io.quarkus.hibernate.orm.panache.PanacheQuery;
@@ -28,18 +29,21 @@ public class VoucherService {
     private static final Sort DEFAULT_SORT = Sort.by("id", Sort.Direction.Descending);
 
     private final VoucherRepository repo;
-    private final SupplierInvoiceRepository invoices;
+    private final SalesInvoiceRepository invoices;
     private final PurchasingLookups lookups;
+    private final ProfileGuard profileGuard;
 
-    public VoucherService(VoucherRepository repo, SupplierInvoiceRepository invoices,
-                          PurchasingLookups lookups) {
+    public VoucherService(VoucherRepository repo, SalesInvoiceRepository invoices,
+                          PurchasingLookups lookups, ProfileGuard profileGuard) {
         this.repo = repo;
         this.invoices = invoices;
         this.lookups = lookups;
+        this.profileGuard = profileGuard;
     }
 
     public PageResponse<VoucherSummaryRow> list(long profileId, long supplierId, PageQuery page,
                                                 String sort, String q, boolean archived) {
+        profileGuard.require(profileId);
         lookups.requireUsableSupplier(profileId, supplierId);
         Sort s = SortSpec.parse(sort, SORTABLE, DEFAULT_SORT);
         PanacheQuery<Voucher> query = repo.search(profileId, supplierId, archived, q, s);
@@ -55,10 +59,11 @@ public class VoucherService {
 
     @Transactional
     public VoucherResponse create(long profileId, long supplierId, VoucherRequest body) {
+        profileGuard.require(profileId);
         lookups.requireUsableSupplier(profileId, supplierId);
         Voucher v = new Voucher();
         v.corporateProfileId = profileId;
-        v.supplierInvoice = requireInvoice(profileId, supplierId, body.supplierInvoiceId());
+        v.salesInvoice = requireInvoice(profileId, supplierId, body.salesInvoiceId());
         apply(v, body);
         repo.persist(v);
         return VoucherResponse.from(v);
@@ -67,7 +72,8 @@ public class VoucherService {
     @Transactional
     public VoucherResponse update(long profileId, long supplierId, long id, VoucherRequest body) {
         Voucher v = require(profileId, supplierId, id);
-        v.supplierInvoice = requireInvoice(profileId, supplierId, body.supplierInvoiceId());
+        requireActive(v);
+        v.salesInvoice = requireInvoice(profileId, supplierId, body.salesInvoiceId());
         apply(v, body);
         return VoucherResponse.from(v);
     }
@@ -75,6 +81,7 @@ public class VoucherService {
     @Transactional
     public VoucherResponse setPaid(long profileId, long supplierId, long id, boolean paid) {
         Voucher v = require(profileId, supplierId, id);
+        requireActive(v);
         v.paid = paid;
         v.paidAt = paid ? OffsetDateTime.now() : null;
         return VoucherResponse.from(v);
@@ -103,21 +110,29 @@ public class VoucherService {
     }
 
     private Voucher require(long profileId, long supplierId, long id) {
+        profileGuard.require(profileId);
         Voucher v = repo.findById(id);
         if (v == null || !Objects.equals(v.corporateProfileId, profileId)
-                || !Objects.equals(v.supplierInvoice.purchaseOrder.supplier.id, supplierId)) {
+                || !Objects.equals(v.salesInvoice.purchaseOrder.supplier.id, supplierId)) {
             throw ApiException.notFound("Voucher");
         }
         return v;
     }
 
-    private SupplierInvoice requireInvoice(long profileId, long supplierId, Long invoiceId) {
-        SupplierInvoice s = invoiceId == null ? null : invoices.findById(invoiceId);
+    // An archived voucher is read-only until it is restored.
+    private void requireActive(Voucher v) {
+        if (v.archivedAt != null) {
+            throw ApiException.conflict("Restore the voucher before editing it.");
+        }
+    }
+
+    private SalesInvoice requireInvoice(long profileId, long supplierId, Long invoiceId) {
+        SalesInvoice s = invoiceId == null ? null : invoices.findById(invoiceId);
         boolean ok = s != null && s.archivedAt == null
                 && Objects.equals(s.corporateProfileId, profileId)
                 && Objects.equals(s.purchaseOrder.supplier.id, supplierId);
         if (!ok) {
-            throw ApiException.invalidField("supplierInvoiceId",
+            throw ApiException.invalidField("salesInvoiceId",
                     "No such active sales invoice for this supplier.");
         }
         return s;

@@ -149,6 +149,13 @@ class PurchasingResourceTest extends AuthenticatedApiTest {
                 .body("total", is(100.0f));
 
         long poId = idOf(poLoc);
+
+        // the list row's count + total come from one grouped query
+        given().when().get(poBase)
+                .then().statusCode(200)
+                .body("items.find { it.id == %d }.itemCount".formatted(poId), is(2))
+                .body("items.find { it.id == %d }.total".formatted(poId), is(100.0f));
+
         String sinvBase = "/api/v1/profiles/" + profileId + "/suppliers/" + supplierId + "/sales-invoices";
 
         // 3. sales invoice off that PO — line items are read from the PO
@@ -163,15 +170,22 @@ class PurchasingResourceTest extends AuthenticatedApiTest {
                 .extract().header("Location");
 
         long sinvId = idOf(sinvLoc);
+
+        // list rows carry a grouped item count + total, not per-row line queries
+        given().when().get(sinvBase)
+                .then().statusCode(200)
+                .body("items.find { it.id == %d }.itemCount".formatted(sinvId), is(2))
+                .body("items.find { it.id == %d }.total".formatted(sinvId), is(100.0f));
+
         String vouBase = "/api/v1/profiles/" + profileId + "/suppliers/" + supplierId + "/vouchers";
 
         // 4. voucher off that S-INV
         String vouLoc = given().contentType("application/json")
-                .body("{ \"supplierInvoiceId\": %d, \"voucherDate\": \"2026-09-08\", \"netAmount\": 96.00 }".formatted(sinvId))
+                .body("{ \"salesInvoiceId\": %d, \"voucherDate\": \"2026-09-08\", \"netAmount\": 96.00 }".formatted(sinvId))
                 .when().post(vouBase)
                 .then().statusCode(201)
                 .body("number", startsWith("VOUC-"))
-                .body("supplierInvoiceNumber", is("S-INV-" + sinvId))
+                .body("salesInvoiceNumber", is("S-INV-" + sinvId))
                 .body("paid", is(false))
                 .body("netAmount", is(96.0f))
                 .extract().header("Location");
