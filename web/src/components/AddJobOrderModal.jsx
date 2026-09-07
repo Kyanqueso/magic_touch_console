@@ -4,10 +4,15 @@ import Modal from './Modal.jsx'
 import Button from './Button.jsx'
 import TextField from './TextField.jsx'
 import Select from './Select.jsx'
+import Combobox from './Combobox.jsx'
 import DateField from './DateField.jsx'
 import NumberField from './NumberField.jsx'
 import NoteField from './NoteField.jsx'
+import DiscardChangesDialog from './DiscardChangesDialog.jsx'
 import { maskDigits, dateRangeError } from '../lib/masks.js'
+
+// One label style for every field in the form, so selects and text inputs line up.
+const LABEL = 'mb-2 block text-base font-bold text-content'
 
 const BRANCHES = ['Main Branch', 'Lapuz', 'Mandurriao', 'Jaro', 'Molo']
 const EQUIPMENT = ['offset', 'riso', 'comcolor', 'digital']
@@ -46,14 +51,25 @@ export default function AddJobOrderModal({ open, onClose, onAdd, customerOptions
   const [form, setForm] = useState(EMPTY)
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
 
   useEffect(() => {
     if (open) {
       setForm(EMPTY)
       setErrors({})
       setLoading(false)
+      setConfirmDiscard(false)
     }
   }, [open])
+
+  const dirty = Object.keys(EMPTY).some((k) => form[k] !== EMPTY[k])
+
+  // Closing a form with something in it should not silently bin the work.
+  function requestClose() {
+    if (loading) return
+    if (dirty) setConfirmDiscard(true)
+    else onClose()
+  }
 
   const set = (k, v) => {
     setForm((f) => ({ ...f, [k]: v }))
@@ -128,10 +144,9 @@ export default function AddJobOrderModal({ open, onClose, onAdd, customerOptions
 
   const select = (label, key, list) => (
     <div>
-      <label className="mb-2 block text-sm font-bold text-content">{label}</label>
+      <label className={LABEL}>{label}</label>
       <Select
         wrapperClassName="w-full"
-        size="sm"
         placeholder="Select"
         value={form[key]}
         onChange={(v) => set(key, v)}
@@ -140,10 +155,25 @@ export default function AddJobOrderModal({ open, onClose, onAdd, customerOptions
     </div>
   )
 
+  // Branch is a combobox: pick a known branch, or type one that isn't listed yet.
+  const branch = (
+    <div>
+      <label className={LABEL}>Branch</label>
+      <Combobox
+        wrapperClassName="w-full"
+        placeholder="Select or type a branch"
+        value={form.branch}
+        onChange={(v) => set('branch', v)}
+        options={BRANCHES}
+        disabled={loading}
+      />
+    </div>
+  )
+
   return (
     <Modal
       open={open}
-      onClose={loading ? undefined : onClose}
+      onClose={requestClose}
       title="Add Job Order"
       description="Materials are added on the job order after it's created."
       icon={<ClipboardList />}
@@ -153,10 +183,9 @@ export default function AddJobOrderModal({ open, onClose, onAdd, customerOptions
         <Group title="Job">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-2 block text-sm font-bold text-content">Customer</label>
+              <label className={LABEL}>Customer</label>
               <Select
                 wrapperClassName="w-full"
-                size="sm"
                 placeholder="Select a customer"
                 value={form.customerId}
                 onChange={(v) => set('customerId', v)}
@@ -164,10 +193,10 @@ export default function AddJobOrderModal({ open, onClose, onAdd, customerOptions
                 invalid={Boolean(errors.customerId)}
               />
               {errors.customerId && (
-                <p className="mt-1 text-sm text-danger">{errors.customerId}</p>
+                <p className="mt-2 text-sm text-danger">{errors.customerId}</p>
               )}
             </div>
-            {select('Branch', 'branch', BRANCHES)}
+            {branch}
             {select('Equipment', 'equipment', EQUIPMENT)}
             {text('Job Description', 'jobDescription')}
             {text('Specification', 'specification')}
@@ -215,7 +244,7 @@ export default function AddJobOrderModal({ open, onClose, onAdd, customerOptions
         />
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="dark" size="sm" onClick={onClose} disabled={loading}>
+          <Button variant="dark" size="sm" onClick={requestClose} disabled={loading}>
             Cancel
           </Button>
           <Button type="submit" variant="success" size="sm" loading={loading} disabled={loading}>
@@ -224,6 +253,13 @@ export default function AddJobOrderModal({ open, onClose, onAdd, customerOptions
           </Button>
         </div>
       </form>
+
+      <DiscardChangesDialog
+        open={confirmDiscard}
+        onClose={() => setConfirmDiscard(false)}
+        onConfirm={onClose}
+        entityLabel="job order"
+      />
     </Modal>
   )
 }

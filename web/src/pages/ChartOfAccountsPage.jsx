@@ -72,10 +72,10 @@ const COLUMNS = [
 ]
 
 const SORT_OPTIONS = [
-  { value: 'code-asc', label: 'Code: low to high' },
-  { value: 'code-desc', label: 'Code: high to low' },
   { value: 'az', label: 'Title: A to Z' },
   { value: 'za', label: 'Title: Z to A' },
+  { value: 'code-asc', label: 'Code: ascending' },
+  { value: 'code-desc', label: 'Code: descending' },
 ]
 
 function makeSorter(sort) {

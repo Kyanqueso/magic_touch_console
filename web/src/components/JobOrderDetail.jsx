@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import Button from './Button.jsx'
 import Select from './Select.jsx'
+import Combobox from './Combobox.jsx'
 import DateField from './DateField.jsx'
 import NumberField from './NumberField.jsx'
 import NoteField from './NoteField.jsx'
@@ -41,7 +42,7 @@ const opt = (list) => list.map((o) => ({ value: o, label: o }))
 const OVERVIEW = [
   ['jobDescription', 'Job Description', 'text'],
   ['specification', 'Specifications', 'text'],
-  ['branch', 'Branch', 'select', BRANCHES],
+  ['branch', 'Branch', 'combo', BRANCHES],
   ['seriesFrom', 'Series From', 'text'],
   ['seriesTo', 'Series To', 'text'],
   ['equipment', 'Equipment', 'select', EQUIPMENT],
@@ -621,6 +622,18 @@ function FieldInput({ type, value, options, onChange }) {
         value={value}
         onChange={onChange}
         options={opt(options)}
+      />
+    )
+  }
+  if (type === 'combo') {
+    return (
+      <Combobox
+        wrapperClassName="w-full"
+        size="sm"
+        placeholder="Select or type"
+        value={value ?? ''}
+        onChange={onChange}
+        options={options}
       />
     )
   }

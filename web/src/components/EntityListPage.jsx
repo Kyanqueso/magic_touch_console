@@ -480,6 +480,7 @@ export default function EntityListPage({
         title={`Add ${formTitle}`}
         submitLabel="Add"
         scopeLocked={!profileId}
+        entityLabel={detailNoun}
       />
 
       <ActionConfirmDialog

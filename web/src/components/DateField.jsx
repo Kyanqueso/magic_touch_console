@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatDate } from '../lib/format.js'
+import usePopoverPosition from '../hooks/usePopoverPosition.js'
 
 // Custom date field so the value shows as "Jun 8, 2025" everywhere instead of
 // the browser's locale format. `value` is an ISO string (yyyy-mm-dd) or '';
 // `onChange` receives the same ISO string (or '' when cleared).
 
 const SIZES = { md: 'py-3 text-base', sm: 'py-2 text-sm' }
+const PANEL_W = 288 // w-72
+const PANEL_H = 340
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -53,42 +57,44 @@ export default function DateField({
   labelClassName = 'mb-2 block text-base font-bold text-content',
 }) {
   const [open, setOpen] = useState(false)
-  const [dropUp, setDropUp] = useState(false)
   const [view, setView] = useState(() => {
     const base = parseISO(value) || todayParts()
     return { y: base.y, m: base.m }
   })
   const rootRef = useRef(null)
+  const panelRef = useRef(null)
 
   const parsed = parseISO(value)
   const fieldId = id || name
+  const pos = usePopoverPosition(open, rootRef, { width: PANEL_W, height: PANEL_H })
 
-  // Jump the grid back to the selected month each time the popover opens, and
-  // flip it above the field when there isn't room below (e.g. low in a modal).
+  // Jump the grid back to the selected month each time the popover opens.
   useEffect(() => {
     if (!open) return
     const base = parseISO(value) || todayParts()
     setView({ y: base.y, m: base.m })
-    const rect = rootRef.current?.getBoundingClientRect()
-    if (rect) {
-      const spaceBelow = window.innerHeight - rect.bottom
-      setDropUp(spaceBelow < 340 && rect.top > spaceBelow)
-    }
   }, [open, value])
 
   useEffect(() => {
     if (!open) return undefined
     function onDocMouseDown(e) {
-      if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false)
+      const inTrigger = rootRef.current?.contains(e.target)
+      const inPanel = panelRef.current?.contains(e.target)
+      if (!inTrigger && !inPanel) setOpen(false)
     }
     function onKey(e) {
-      if (e.key === 'Escape') setOpen(false)
+      // Stop here so Escape closes the calendar without also closing the modal
+      // the field sits in.
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        setOpen(false)
+      }
     }
     document.addEventListener('mousedown', onDocMouseDown)
-    document.addEventListener('keydown', onKey)
+    document.addEventListener('keydown', onKey, true)
     return () => {
       document.removeEventListener('mousedown', onDocMouseDown)
-      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('keydown', onKey, true)
     }
   }, [open])
 
@@ -140,12 +146,12 @@ export default function DateField({
           <CalendarDays className="h-4 w-4 shrink-0 text-content-muted" />
         </button>
 
-        {open && (
+        {open && pos && createPortal(
           <div
+            ref={panelRef}
             role="dialog"
-            className={`animate-dropdown absolute left-0 z-20 w-72 rounded-lg border border-purple-light bg-white p-3 shadow-lg ${
-              dropUp ? 'bottom-full mb-2' : 'top-full mt-2'
-            }`}
+            style={{ left: pos.left, top: pos.top, bottom: pos.bottom }}
+            className="animate-dropdown fixed z-[60] w-72 rounded-lg border border-purple-light bg-white p-3 shadow-lg"
           >
             <div className="mb-2 flex items-center justify-between">
               <button
@@ -212,7 +218,8 @@ export default function DateField({
                 Clear
               </button>
             )}
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}

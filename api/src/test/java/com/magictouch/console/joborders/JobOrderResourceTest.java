@@ -81,6 +81,62 @@ class JobOrderResourceTest extends AuthenticatedApiTest {
                 .body("items.jobDescription", hasItem("Sales Invoice Printing"));
     }
 
+    /** Every Order-details field must survive the round trip, not just the ones the list row shows. */
+    @Test
+    void orderDetailsSurviveCreateAndUpdate() {
+        String loc = given().contentType("application/json")
+                .body("""
+                    {
+                      "customerId": %d,
+                      "branch": "Mandurriao",
+                      "seriesFrom": "10001",
+                      "seriesTo": "10500",
+                      "equipment": "riso",
+                      "specification": "Printing Receipt",
+                      "dateOrdered": "2026-09-01",
+                      "deliveryDate": "2026-09-10",
+                      "customerPoRef": "PO-88",
+                      "atpNo": "ATP-77",
+                      "atpDate": "2026-08-20",
+                      "invoiceNo": "INV-66",
+                      "invoiceDate": "2026-09-05",
+                      "orNo": "OR-55",
+                      "orDate": "2026-09-06",
+                      "operator": "Jun",
+                      "collator": "Ana"
+                    }
+                    """.formatted(customerId))
+                .when().post(base).then().statusCode(201).extract().header("Location");
+
+        given().when().get(loc).then().statusCode(200)
+                .body("branch", is("Mandurriao"))
+                .body("seriesFrom", is("10001"))
+                .body("seriesTo", is("10500"))
+                .body("equipment", is("riso"))
+                .body("specification", is("Printing Receipt"))
+                .body("dateOrdered", is("2026-09-01"))
+                .body("deliveryDate", is("2026-09-10"))
+                .body("customerPoRef", is("PO-88"))
+                .body("atpNo", is("ATP-77"))
+                .body("atpDate", is("2026-08-20"))
+                .body("invoiceNo", is("INV-66"))
+                .body("invoiceDate", is("2026-09-05"))
+                .body("orNo", is("OR-55"))
+                .body("orDate", is("2026-09-06"))
+                .body("operator", is("Jun"))
+                .body("collator", is("Ana"));
+
+        // An update carrying the same fields must not blank them out either.
+        given().contentType("application/json")
+                .body("""
+                    { "customerId": %d, "branch": "Jaro", "atpNo": "ATP-99", "orNo": "OR-55" }
+                    """.formatted(customerId))
+                .when().put(loc).then().statusCode(200)
+                .body("branch", is("Jaro"))
+                .body("atpNo", is("ATP-99"))
+                .body("orNo", is("OR-55"));
+    }
+
     @Test
     void rejectsDeliveryBeforeOrderDate() {
         given().contentType("application/json")

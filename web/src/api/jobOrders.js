@@ -5,7 +5,12 @@ import { api, qs } from './http.js'
 // to the old mock (po / atp / collate) and translated here.
 
 const STATUS_TO_UI = { OPEN: 'Open', CLOSED: 'Closed' }
-const SORT_MAP = { 'id-desc': '-id', 'id-asc': 'id', customer: 'customer' }
+const SORT_MAP = {
+  'customer-asc': 'customer',
+  'customer-desc': '-customer',
+  'id-asc': 'id',
+  'id-desc': '-id',
+}
 
 // The list endpoint returns lean rows — the wide detail table lives in JobOrderDetail.
 export const JOB_ORDER_LIST_COLUMNS = [

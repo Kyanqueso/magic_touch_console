@@ -44,9 +44,10 @@ const TABS = [
   { value: 'archive', label: 'Archive' },
 ]
 const SORT_OPTIONS = [
-  { value: 'id-desc', label: 'Job No: newest' },
-  { value: 'id-asc', label: 'Job No: oldest' },
-  { value: 'customer', label: 'Customer: A to Z' },
+  { value: 'customer-asc', label: 'Customer: A to Z' },
+  { value: 'customer-desc', label: 'Customer: Z to A' },
+  { value: 'id-asc', label: 'Job No: ascending' },
+  { value: 'id-desc', label: 'Job No: descending' },
 ]
 
 const EDITABLE = ['jobDescription', 'dateOrdered', 'deliveryDate', 'qty', 'unitPrice']

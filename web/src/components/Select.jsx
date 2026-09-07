@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, ChevronDown } from 'lucide-react'
+import usePopoverPosition from '../hooks/usePopoverPosition.js'
 
 const SIZES = {
   md: 'py-3 text-base',
   sm: 'py-2 text-sm',
 }
+const PANEL_H = 280
 
 export default function Select({
   value,
@@ -19,13 +22,16 @@ export default function Select({
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
   const rootRef = useRef(null)
+  const panelRef = useRef(null)
 
   const selected = options.find((o) => o.value === value)
+  const pos = usePopoverPosition(open, rootRef, { height: PANEL_H, matchWidth: true })
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return undefined
     function onDocMouseDown(e) {
-      if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false)
+      if (rootRef.current?.contains(e.target) || panelRef.current?.contains(e.target)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', onDocMouseDown)
     return () => document.removeEventListener('mousedown', onDocMouseDown)
@@ -43,6 +49,9 @@ export default function Select({
 
   function onKeyDown(e) {
     if (e.key === 'Escape') {
+      // Only swallow Escape when there is a list to close, so it still reaches
+      // the modal otherwise.
+      if (open) e.stopPropagation()
       setOpen(false)
     } else if (!open && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault()
@@ -87,10 +96,12 @@ export default function Select({
         />
       </button>
 
-      {open && (
+      {open && pos && createPortal(
         <ul
+          ref={panelRef}
           role="listbox"
-          className="animate-dropdown absolute z-20 mt-2 max-h-64 w-full min-w-max overflow-auto rounded-lg border border-purple-light bg-white p-1 shadow-lg"
+          style={{ left: pos.left, top: pos.top, bottom: pos.bottom, minWidth: pos.width }}
+          className="animate-dropdown fixed z-[60] max-h-64 overflow-auto rounded-lg border border-purple-light bg-white p-1 shadow-lg"
         >
           {options.map((o, i) => {
             const isSelected = o.value === value
@@ -110,7 +121,8 @@ export default function Select({
               </li>
             )
           })}
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   )

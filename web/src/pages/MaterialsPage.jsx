@@ -47,10 +47,10 @@ const TABS = [
 ]
 
 const SORT_OPTIONS = [
-  { value: 'code-asc', label: 'Code: A to Z' },
-  { value: 'code-desc', label: 'Code: Z to A' },
-  { value: 'price-asc', label: 'Price: low to high' },
-  { value: 'price-desc', label: 'Price: high to low' },
+  { value: 'code-asc', label: 'Code: ascending' },
+  { value: 'code-desc', label: 'Code: descending' },
+  { value: 'price-asc', label: 'Price: ascending' },
+  { value: 'price-desc', label: 'Price: descending' },
 ]
 
 const FIELDS = [

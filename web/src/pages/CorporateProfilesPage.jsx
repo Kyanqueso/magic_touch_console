@@ -22,10 +22,10 @@ import {
 } from '../api/profiles.js'
 
 const SORT_OPTIONS = [
-  { value: 'latest', label: 'Latest added' },
-  { value: 'earliest', label: 'Earliest added' },
   { value: 'az', label: 'Name: A to Z' },
   { value: 'za', label: 'Name: Z to A' },
+  { value: 'latest', label: 'Date added: newest' },
+  { value: 'earliest', label: 'Date added: oldest' },
 ]
 
 const TABS = [

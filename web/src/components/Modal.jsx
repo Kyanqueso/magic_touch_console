@@ -1,8 +1,10 @@
-import { cloneElement, useEffect } from 'react'
+import { cloneElement, useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 
-// Ref-count so scroll stays locked while any modal is open (stack-safe).
-let openModals = 0
+// The open modals, innermost last. Keeps the scroll lock stack-safe and lets
+// Escape close only the top one — a confirm dialog raised over a form must not
+// dismiss the form underneath it as well.
+let stack = []
 
 const ACCENTS = {
   purple: 'bg-component-bg text-purple',
@@ -21,22 +23,28 @@ export default function Modal({
   accent = 'purple',
   children,
 }) {
+  const idRef = useRef({})
+
+  // Kept apart from the Escape handler below: that one re-runs whenever the
+  // caller passes a fresh onClose, which must not reshuffle the stack.
+  useEffect(() => {
+    if (!open) return undefined
+    const id = idRef.current
+    stack.push(id)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      stack = stack.filter((x) => x !== id)
+      if (stack.length === 0) document.body.style.overflow = ''
+    }
+  }, [open])
+
   useEffect(() => {
     if (!open) return undefined
     function onKey(e) {
-      if (e.key === 'Escape') onClose?.()
+      if (e.key === 'Escape' && stack[stack.length - 1] === idRef.current) onClose?.()
     }
     document.addEventListener('keydown', onKey)
-    openModals += 1
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      openModals -= 1
-      if (openModals <= 0) {
-        openModals = 0
-        document.body.style.overflow = ''
-      }
-    }
+    return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
   if (!open) return null

@@ -5,6 +5,7 @@ import Button from './Button.jsx'
 import TextField from './TextField.jsx'
 import Select from './Select.jsx'
 import NoteField from './NoteField.jsx'
+import DiscardChangesDialog from './DiscardChangesDialog.jsx'
 import { maskTIN, maskZip } from '../lib/masks.js'
 
 export const TERMS = ['COD', '30', '60', '90']
@@ -46,6 +47,8 @@ export default function CompanyFormModal({
   title,
   submitLabel = 'Add',
   scopeLocked = false,
+  // Names the record in the "cancel adding the ..." prompt.
+  entityLabel = 'company',
 }) {
   const [form, setForm] = useState(() => ({
     ...EMPTY,
@@ -53,14 +56,26 @@ export default function CompanyFormModal({
   }))
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
 
   useEffect(() => {
     if (open) {
       setForm({ ...EMPTY, scope: scopeLocked ? 'Global' : EMPTY.scope })
       setErrors({})
       setLoading(false)
+      setConfirmDiscard(false)
     }
   }, [open, scopeLocked])
+
+  const pristine = { ...EMPTY, scope: scopeLocked ? 'Global' : EMPTY.scope }
+  const dirty = Object.keys(pristine).some((k) => form[k] !== pristine[k])
+
+  // Closing a form with something in it should not silently bin the work.
+  function requestClose() {
+    if (loading) return
+    if (dirty) setConfirmDiscard(true)
+    else onClose()
+  }
 
   const set = (k, v) => {
     setForm((f) => ({ ...f, [k]: v }))
@@ -85,7 +100,7 @@ export default function CompanyFormModal({
   return (
     <Modal
       open={open}
-      onClose={loading ? undefined : onClose}
+      onClose={requestClose}
       title={title}
       description="Fill in the company details."
       icon={<Plus />}
@@ -186,7 +201,7 @@ export default function CompanyFormModal({
         )}
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="dark" size="sm" onClick={onClose} disabled={loading}>
+          <Button variant="dark" size="sm" onClick={requestClose} disabled={loading}>
             Cancel
           </Button>
           <Button type="submit" variant="success" size="sm" loading={loading} disabled={loading}>
@@ -195,6 +210,13 @@ export default function CompanyFormModal({
           </Button>
         </div>
       </form>
+
+      <DiscardChangesDialog
+        open={confirmDiscard}
+        onClose={() => setConfirmDiscard(false)}
+        onConfirm={onClose}
+        entityLabel={entityLabel}
+      />
     </Modal>
   )
 }
