@@ -21,10 +21,16 @@ public class PurchasingLookups {
         this.accounts = accounts;
     }
 
-    /** The composite FK requires a Local supplier of the same profile. */
-    public Supplier requireLocalSupplier(long profileId, long supplierId) {
+    /**
+     * A supplier this profile may buy from: its own Local one, or any Global
+     * one. Global entries are shared so the same firm need not be re-added to
+     * every profile; the document itself still belongs to the buying profile.
+     */
+    public Supplier requireUsableSupplier(long profileId, long supplierId) {
         Supplier s = suppliers.findById(supplierId);
-        if (s == null || s.scope != Scope.LOCAL || !Objects.equals(s.corporateProfileId, profileId)) {
+        boolean usable = s != null
+                && (s.scope == Scope.GLOBAL || Objects.equals(s.corporateProfileId, profileId));
+        if (!usable) {
             throw ApiException.notFound("Supplier");
         }
         return s;

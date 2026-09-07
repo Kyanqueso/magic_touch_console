@@ -11,6 +11,13 @@ public interface SupabaseAdminClient {
     /** Creates a confirmed, password-less login. Returns the id to use as app_users.id. */
     UUID createAuthUser(String email);
 
+    /**
+     * Changes the address someone signs in with. Without this the console and
+     * Supabase drift apart: the profile shows the new email while the login,
+     * and password recovery, still use the old one.
+     */
+    void updateAuthUserEmail(UUID id, String email);
+
     /** Removes the login, so it cannot outlive the profile it belonged to. */
     void deleteAuthUser(UUID id);
 }

@@ -40,7 +40,7 @@ public class SupplierInvoiceService {
 
     public PageResponse<SupplierInvoiceSummaryRow> list(long profileId, long supplierId, PageQuery page,
                                                         String sort, String q, boolean archived) {
-        lookups.requireLocalSupplier(profileId, supplierId);
+        lookups.requireUsableSupplier(profileId, supplierId);
         Sort s = SortSpec.parse(sort, SORTABLE, DEFAULT_SORT);
         PanacheQuery<SupplierInvoice> query = repo.search(profileId, supplierId, archived, q, s);
         long total = query.count();
@@ -55,7 +55,7 @@ public class SupplierInvoiceService {
 
     @Transactional
     public SupplierInvoiceResponse create(long profileId, long supplierId, SupplierInvoiceRequest body) {
-        lookups.requireLocalSupplier(profileId, supplierId);
+        lookups.requireUsableSupplier(profileId, supplierId);
         SupplierInvoice s = new SupplierInvoice();
         s.corporateProfileId = profileId;
         s.purchaseOrder = requirePo(profileId, supplierId, body.purchaseOrderId());

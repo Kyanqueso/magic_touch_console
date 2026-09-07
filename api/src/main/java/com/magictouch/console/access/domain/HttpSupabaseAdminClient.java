@@ -84,6 +84,36 @@ public class HttpSupabaseAdminClient implements SupabaseAdminClient {
     }
 
     @Override
+    public void updateAuthUserEmail(UUID id, String email) {
+        String body;
+        try {
+            // email_confirm marks the new address verified, so the person can
+            // sign in with it straight away rather than waiting on a
+            // confirmation mail that would leave the old address active.
+            body = json.writeValueAsString(java.util.Map.of(
+                    "email", email,
+                    "email_confirm", true));
+        } catch (Exception e) {
+            throw new IllegalStateException("Could not build the Supabase request", e);
+        }
+
+        HttpResponse<String> res = send(HttpRequest.newBuilder()
+                .uri(URI.create(requireBaseUrl() + "/auth/v1/admin/users/" + id))
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)));
+
+        if (res.statusCode() == 422 || res.statusCode() == 409) {
+            throw ApiException.invalidField("email",
+                    "Another Supabase login already uses this email.");
+        }
+        if (res.statusCode() < 200 || res.statusCode() >= 300) {
+            LOG.errorf("Supabase admin email update failed: HTTP %d %s", res.statusCode(), res.body());
+            throw new ApiException(jakarta.ws.rs.core.Response.Status.BAD_GATEWAY, "SUPABASE_ERROR",
+                    "Could not update the login email in Supabase.", null);
+        }
+    }
+
+    @Override
     public void deleteAuthUser(UUID id) {
         HttpResponse<String> res = send(HttpRequest.newBuilder()
                 .uri(URI.create(requireBaseUrl() + "/auth/v1/admin/users/" + id))

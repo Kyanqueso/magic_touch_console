@@ -1,0 +1,17 @@
+RUNNING DATABASE MIGRATIONS
+===========================
+
+1. In api/.env, change the DB_URL port from 6543 to 5432.
+   (6543 = transaction mode for normal traffic. 5432 = session mode, which
+   Flyway needs because its lock requires a pinned session.)
+
+2. cd api
+   .\dev.ps1 quarkus:dev "-Dquarkus.profile=staging"
+
+3. Wait for:  Successfully applied N migrations
+
+4. Ctrl+C, then change DB_URL back to 6543.
+
+5. Deploy:
+   .\dev.ps1 clean package
+   sam deploy

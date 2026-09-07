@@ -56,29 +56,29 @@ export function printDocument({
 <html><head><meta charset="utf-8"><title>${esc(number || docTitle)}</title><style>
   @page { margin: 14mm; ${landscape ? 'size: landscape;' : ''} }
   * { box-sizing: border-box; }
-  body { margin:0; font: 12px/1.5 Lato, Helvetica, Arial, sans-serif; color:#1a1d21; }
+  body { margin:0; font: 12px/1.5 Lato, Helvetica, Arial, sans-serif; color:#000; }
   header { display:flex; justify-content:space-between; align-items:flex-start;
-           border-bottom:2px solid #8122E0; padding-bottom:10px; margin-bottom:16px; }
-  .co { font-size:16px; font-weight:800; color:#8122E0; }
+           border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:16px; }
+  .co { font-size:16px; font-weight:800; }
   .doc { font-size:15px; font-weight:800; letter-spacing:.5px; text-align:right; }
-  .no { font-size:12px; color:#5b6470; text-align:right; }
+  .no { font-size:12px; color:#333; text-align:right; }
   .meta { display:grid; grid-template-columns:1fr 1fr; gap:4px 24px; margin-bottom:16px; }
   .f { display:flex; gap:8px; }
-  .l { color:#5b6470; min-width:110px; }
+  .l { color:#333; min-width:110px; }
   .v { font-weight:600; }
   table { width:100%; border-collapse:collapse; margin-top:8px; }
   th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.4px;
-       color:#5b6470; border-bottom:1px solid #CECBF6; padding:6px 4px; }
-  td { padding:6px 4px; border-bottom:1px solid #eee; }
-  td.r, th.r { text-align:right; } td.c { text-align:center; color:#5b6470; }
-  tfoot td { border-top:2px solid #1a1d21; border-bottom:none; font-weight:800; padding-top:8px; }
+       color:#000; border-bottom:1px solid #000; padding:6px 4px; }
+  td { padding:6px 4px; border-bottom:1px solid #bbb; }
+  td.r, th.r { text-align:right; } td.c { text-align:center; color:#333; }
+  tfoot td { border-top:2px solid #000; border-bottom:none; font-weight:800; padding-top:8px; }
   .sec { font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.5px;
-         color:#8122E0; margin:18px 0 0; }
+         margin:18px 0 0; }
   .sigs { display:flex; gap:40px; margin-top:48px; }
   .sig { flex:1; }
-  .line { border-bottom:1px solid #1a1d21; min-height:22px; font-weight:600; }
-  .cap { font-size:11px; color:#5b6470; margin-top:4px; }
-  footer { margin-top:28px; font-size:10px; color:#5b6470; }
+  .line { border-bottom:1px solid #000; min-height:22px; font-weight:600; }
+  .cap { font-size:11px; color:#333; margin-top:4px; }
+  footer { margin-top:28px; font-size:10px; color:#333; }
 </style></head><body>
   <header>
     <div class="co">${esc(company)}</div>

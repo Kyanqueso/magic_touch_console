@@ -8,8 +8,10 @@ import org.junit.jupiter.api.Test;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.startsWith;
 
@@ -38,7 +40,7 @@ class PurchasingResourceTest extends AuthenticatedApiTest {
                 .when().post("/api/v1/profiles/" + profileId + "/suppliers")
                 .then().statusCode(201).extract().jsonPath().getLong("id");
 
-        // Global supplier — must NOT be usable on POs
+        // Global supplier - shared, and usable on POs from any profile
         globalSupplierId = given().contentType("application/json")
                 .body("{ \"scope\": \"GLOBAL\", \"name\": \"Global Freight Co.\" }")
                 .when().post("/api/v1/profiles/" + profileId + "/suppliers")
@@ -58,11 +60,58 @@ class PurchasingResourceTest extends AuthenticatedApiTest {
         return Long.parseLong(location.substring(location.lastIndexOf('/') + 1));
     }
 
+    /**
+     * Global suppliers exist so the same firm need not be re-added to every
+     * profile, so buying from one must work.
+     */
     @Test
-    void globalSupplierCannotHavePurchaseOrders() {
+    void globalSupplierCanHavePurchaseOrders() {
         given().contentType("application/json")
                 .body("{ \"poDate\": \"2026-09-01\" }")
                 .when().post("/api/v1/profiles/" + profileId + "/suppliers/" + globalSupplierId + "/purchase-orders")
+                .then().statusCode(201)
+                .body("supplierId", is((int) globalSupplierId));
+    }
+
+    /**
+     * Sharing the supplier must not share the paperwork: a document belongs to
+     * the profile that raised it.
+     */
+    @Test
+    void twoProfilesSharingAGlobalSupplierDoNotSeeEachOthersOrders() {
+        long otherProfile = idOf(given().contentType("application/json")
+                .body("{ \"name\": \"Second Co.\" }")
+                .when().post("/api/v1/profiles")
+                .then().statusCode(201).extract().header("Location"));
+
+        String mine = "/api/v1/profiles/" + profileId + "/suppliers/" + globalSupplierId + "/purchase-orders";
+        String theirs = "/api/v1/profiles/" + otherProfile + "/suppliers/" + globalSupplierId + "/purchase-orders";
+
+        String myPo = given().contentType("application/json")
+                .body("{ \"poDate\": \"2026-09-02\" }")
+                .when().post(mine).then().statusCode(201)
+                .extract().jsonPath().getString("number");
+
+        given().contentType("application/json")
+                .body("{ \"poDate\": \"2026-09-03\" }")
+                .when().post(theirs).then().statusCode(201);
+
+        given().when().get(theirs).then().statusCode(200)
+                .body("items.number", not(hasItem(myPo)));
+        given().when().get(mine).then().statusCode(200)
+                .body("items.number", hasItem(myPo));
+    }
+
+    @Test
+    void aSupplierLocalToAnotherProfileIsStillRejected() {
+        long otherProfile = idOf(given().contentType("application/json")
+                .body("{ \"name\": \"Third Co.\" }")
+                .when().post("/api/v1/profiles")
+                .then().statusCode(201).extract().header("Location"));
+
+        given().contentType("application/json")
+                .body("{ \"poDate\": \"2026-09-01\" }")
+                .when().post("/api/v1/profiles/" + otherProfile + "/suppliers/" + supplierId + "/purchase-orders")
                 .then().statusCode(404);
     }
 

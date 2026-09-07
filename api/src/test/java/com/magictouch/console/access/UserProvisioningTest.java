@@ -66,6 +66,30 @@ class UserProvisioningTest extends AuthenticatedApiTest {
         org.junit.jupiter.api.Assertions.assertFalse(supabase.hasLoginFor(mail));
     }
 
+    /** The login must follow the profile, or they sign in with the old address. */
+    @Test
+    void changingTheEmailAlsoChangesTheSupabaseLogin() {
+        String before = email();
+        String after = email();
+
+        String loc = given().contentType("application/json")
+                .body("{ \"firstName\": \"Mia\", \"lastName\": \"Reyes\", \"email\": \"%s\" }".formatted(before))
+                .when().post("/api/v1/users")
+                .then().statusCode(201).extract().header("Location");
+        UUID id = UUID.fromString(loc.substring(loc.lastIndexOf('/') + 1));
+
+        given().contentType("application/json")
+                .body("{ \"firstName\": \"Mia\", \"lastName\": \"Reyes\", \"email\": \"%s\" }".formatted(after))
+                .when().put(loc)
+                .then().statusCode(200)
+                .body("email", is(after));
+
+        org.junit.jupiter.api.Assertions.assertEquals(id, supabase.idFor(after),
+                "the login should now use the new email");
+        org.junit.jupiter.api.Assertions.assertFalse(supabase.hasLoginFor(before),
+                "the old email should no longer sign in");
+    }
+
     @Test
     void aDuplicateEmailIsRejectedBeforeAnyLoginIsCreated() {
         String mail = email();

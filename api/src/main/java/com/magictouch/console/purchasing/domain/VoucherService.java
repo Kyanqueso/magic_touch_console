@@ -40,7 +40,7 @@ public class VoucherService {
 
     public PageResponse<VoucherSummaryRow> list(long profileId, long supplierId, PageQuery page,
                                                 String sort, String q, boolean archived) {
-        lookups.requireLocalSupplier(profileId, supplierId);
+        lookups.requireUsableSupplier(profileId, supplierId);
         Sort s = SortSpec.parse(sort, SORTABLE, DEFAULT_SORT);
         PanacheQuery<Voucher> query = repo.search(profileId, supplierId, archived, q, s);
         long total = query.count();
@@ -55,7 +55,7 @@ public class VoucherService {
 
     @Transactional
     public VoucherResponse create(long profileId, long supplierId, VoucherRequest body) {
-        lookups.requireLocalSupplier(profileId, supplierId);
+        lookups.requireUsableSupplier(profileId, supplierId);
         Voucher v = new Voucher();
         v.corporateProfileId = profileId;
         v.supplierInvoice = requireInvoice(profileId, supplierId, body.supplierInvoiceId());

@@ -44,7 +44,7 @@ public class PurchaseOrderService {
 
     public PageResponse<PurchaseOrderSummaryRow> list(long profileId, long supplierId, PageQuery page,
                                                       String sort, String q, boolean archived) {
-        lookups.requireLocalSupplier(profileId, supplierId);
+        lookups.requireUsableSupplier(profileId, supplierId);
         Sort s = SortSpec.parse(sort, SORTABLE, DEFAULT_SORT);
         PanacheQuery<PurchaseOrder> query = repo.search(profileId, supplierId, archived, q, s);
         long total = query.count();
@@ -61,7 +61,7 @@ public class PurchaseOrderService {
     public PurchaseOrderResponse create(long profileId, long supplierId, PurchaseOrderRequest body) {
         PurchaseOrder po = new PurchaseOrder();
         po.corporateProfileId = profileId;
-        po.supplier = lookups.requireLocalSupplier(profileId, supplierId);
+        po.supplier = lookups.requireUsableSupplier(profileId, supplierId);
         apply(po, body);
         repo.persist(po);
         return PurchaseOrderResponse.from(po);

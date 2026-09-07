@@ -125,6 +125,11 @@ public class AccessService {
         }
     }
 
+    /**
+     * Updates the profile, carrying an email change through to the Supabase
+     * login. Without that the two drift apart and the person keeps signing in
+     * with - and receives password resets at - their old address.
+     */
     @Transactional
     public UserResponse updateUser(UUID id, UserRequest body) {
         AppUser u = require(id);
@@ -134,12 +139,29 @@ public class AccessService {
                 .ifPresent(x -> {
                     throw ApiException.conflict("A user with that email already exists.");
                 });
-        applyProfile(u, body);
-        if (body.grants() != null) {
-            applyMatrix(id, body.grants());
+
+        String previousEmail = u.email;
+        boolean emailChanged = !email.equalsIgnoreCase(previousEmail);
+        if (emailChanged) {
+            supabase.updateAuthUserEmail(id, email);
         }
-        users.getEntityManager().flush();
-        return UserResponse.from(u, matrixFor(id));
+
+        try {
+            applyProfile(u, body);
+            if (body.grants() != null) {
+                applyMatrix(id, body.grants());
+            }
+            users.getEntityManager().flush();
+            return UserResponse.from(u, matrixFor(id));
+        } catch (RuntimeException e) {
+            // The database work is rolling back, so put the login back too
+            // rather than leaving them signing in with an address the console
+            // does not know about.
+            if (emailChanged) {
+                supabase.updateAuthUserEmail(id, previousEmail);
+            }
+            throw e;
+        }
     }
 
     @Transactional

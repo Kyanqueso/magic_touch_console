@@ -36,6 +36,17 @@ public class FakeSupabaseAdminClient implements SupabaseAdminClient {
     }
 
     @Override
+    public void updateAuthUserEmail(UUID id, String email) {
+        String key = email.trim().toLowerCase();
+        UUID owner = byEmail.get(key);
+        if (owner != null && !owner.equals(id)) {
+            throw ApiException.invalidField("email", "Another Supabase login already uses this email.");
+        }
+        byEmail.values().removeIf(id::equals);
+        byEmail.put(key, id);
+    }
+
+    @Override
     public void deleteAuthUser(UUID id) {
         deleted.add(id);
         byEmail.values().removeIf(id::equals);
