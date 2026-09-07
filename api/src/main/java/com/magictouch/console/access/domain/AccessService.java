@@ -181,7 +181,11 @@ public class AccessService {
      */
     @Transactional
     public void deleteUser(UUID id) {
-        require(id);
+        AppUser u = require(id);
+        // An administrator must be demoted before anyone (including themselves) can delete them.
+        if (u.role == UserRole.ADMIN) {
+            throw ApiException.conflict("Demote this administrator before deleting them.");
+        }
         supabase.deleteAuthUser(id);
         userModules.delete("userId", id);
         users.delete("id", id);
@@ -263,10 +267,14 @@ public class AccessService {
         u.role = b.role() != null ? b.role() : u.role;
     }
 
-    // Only an admin acting on someone else may change a role; nobody may change their own.
+    // The only permitted role change is an admin promoting another user to admin.
+    // Admin is a one-way state: no demotions, and nobody changes their own role.
     private void enforceRoleChangeRules(UUID targetId, AppUser target, UserRole requestedRole) {
         if (requestedRole == null || requestedRole == target.role) {
             return;
+        }
+        if (target.role == UserRole.ADMIN) {
+            throw ApiException.conflict("An administrator cannot be demoted.");
         }
         UUID actorId = CurrentUser.id().orElse(null);
         if (actorId != null && actorId.equals(targetId)) {

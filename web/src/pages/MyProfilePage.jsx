@@ -7,6 +7,7 @@ import {
   RotateCcw,
   Save,
   Search,
+  ShieldCheck,
   Trash2,
   UserRound,
 } from 'lucide-react'
@@ -36,6 +37,7 @@ import {
   deleteUser as apiDeleteUser,
   getUserMatrix,
   setUserMatrix,
+  setUserRole,
   updateUserProfile,
 } from '../api/users.js'
 
@@ -304,6 +306,7 @@ function UserAccessPanel({ userId, onBack, onSaved, onError }) {
   const [leaveTo, setLeaveTo] = useState(null)
   const [confirmUndo, setConfirmUndo] = useState(false)
   const [confirmSave, setConfirmSave] = useState(false)
+  const [confirmRole, setConfirmRole] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -384,6 +387,16 @@ function UserAccessPanel({ userId, onBack, onSaved, onError }) {
     }
   }
 
+  const isAdminUser = user?.role === 'admin'
+
+  // Promotion only — admin is a one-way state. ConfirmDialog surfaces failures inline.
+  async function promoteToAdmin() {
+    const updated = await setUserRole(userId, user, 'admin')
+    setUser((u) => ({ ...u, ...updated }))
+    setRows(await getUserMatrix(userId))
+    onSaved?.()
+  }
+
   if (!user) {
     return <Loading label="Loading user..." />
   }
@@ -392,7 +405,7 @@ function UserAccessPanel({ userId, onBack, onSaved, onError }) {
 
   return (
     <div>
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <button
           type="button"
           onClick={() => guard(onBack)}
@@ -401,16 +414,45 @@ function UserAccessPanel({ userId, onBack, onSaved, onError }) {
         >
           <ArrowLeft className="h-6 w-6" />
         </button>
-        <div>
-          <h2 className="text-xl font-extrabold text-content">
-            {user.employeeNo} - {fullName(user)}
-          </h2>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-xl font-extrabold text-content">
+              {user.employeeNo} - {fullName(user)}
+            </h2>
+            {isAdminUser && (
+              <span className="rounded-full bg-purple-light px-2 py-0.5 text-xs font-bold text-purple">
+                Admin
+              </span>
+            )}
+          </div>
           <p className="text-sm text-content-muted">
             {user.contactNo || '—'} | {user.email}
           </p>
         </div>
+        {!isAdminUser && (
+          <button
+            type="button"
+            onClick={() => setConfirmRole(true)}
+            disabled={editing}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-purple px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-purple-hover disabled:opacity-50"
+          >
+            <ShieldCheck className="h-4 w-4" />
+            Promote to Admin
+          </button>
+        )}
       </div>
 
+      {isAdminUser ? (
+        <div className="mt-6 flex items-start gap-2 rounded-xl border border-purple-light bg-white p-4 text-sm text-content-muted">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-purple" />
+          <span>
+            This user is an administrator: full access to every module, plus user management.
+            The per-module access list does not apply. Admin is permanent — it can't be
+            undone here.
+          </span>
+        </div>
+      ) : (
+      <>
       <div className="mt-6 flex items-center gap-3">
         <h3 className="flex-1 text-base font-bold text-content">Access per module</h3>
         {editing ? (
@@ -461,12 +503,34 @@ function UserAccessPanel({ userId, onBack, onSaved, onError }) {
           change, or use Undo&nbsp;All.
         </p>
       )}
+      </>
+      )}
 
       <LeaveEditDialog
         open={Boolean(leaveTo)}
         onClose={() => setLeaveTo(null)}
         onConfirm={confirmLeave}
       />
+
+      <ConfirmDialog
+        open={confirmRole}
+        onClose={() => setConfirmRole(false)}
+        title="Promote to Admin"
+        confirmLabel="Promote"
+        cancelLabel="Cancel"
+        loadingLabel="Promoting..."
+        confirmVariant="info"
+        confirmIcon={<ShieldCheck className="h-4 w-4" />}
+        onConfirm={promoteToAdmin}
+      >
+        <p>
+          Make <span className="font-bold">{fullName(user)}</span> an administrator? They will get
+          full access to every module and be able to manage other users.
+        </p>
+        <p className="mt-2 font-bold text-danger">
+          This is permanent — an admin can't be demoted or deleted here afterward.
+        </p>
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={confirmUndo}
@@ -629,20 +693,30 @@ function ManageUsers({ modules, onOpen, onNotify }) {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-base font-extrabold text-content">#{u.employeeNo}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-base font-extrabold text-content">#{u.employeeNo}</p>
+                    {u.role === 'admin' && (
+                      <span className="rounded-full bg-purple-light px-2 py-0.5 text-[10px] font-bold text-purple">
+                        Admin
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-0.5 truncate text-sm font-semibold text-content">{fullName(u)}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setDeleteTarget(u)
-                  }}
-                  aria-label="Delete user"
-                  className="shrink-0 rounded-md bg-danger p-1 text-white transition-colors hover:bg-danger-hover"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                {/* Admins must be demoted before they can be deleted. */}
+                {u.role !== 'admin' && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setDeleteTarget(u)
+                    }}
+                    aria-label="Delete user"
+                    className="shrink-0 rounded-md bg-danger p-1 text-white transition-colors hover:bg-danger-hover"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
               <div className="mt-3 space-y-0.5 text-sm text-content-muted">
                 <p className="truncate">{u.email}</p>

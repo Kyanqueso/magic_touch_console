@@ -133,6 +133,31 @@ class AccessResourceTest extends AuthenticatedApiTest {
     }
 
     @Test
+    void administratorIsAOneWayState() {
+        String mail = email();
+        String loc = createUser("""
+            { "firstName": "Ad", "lastName": "Min", "email": "%s", "role": "ADMIN" }
+            """.formatted(mail));
+
+        // Cannot be demoted...
+        given().contentType("application/json")
+                .body("{ \"firstName\": \"Ad\", \"lastName\": \"Min\", \"email\": \"%s\", \"role\": \"USER\" }"
+                        .formatted(mail))
+                .when().put(loc).then().statusCode(409)
+                .body("error.code", is("CONFLICT"));
+
+        // ...and cannot be deleted.
+        given().when().delete(loc).then().statusCode(409)
+                .body("error.code", is("CONFLICT"));
+
+        // A no-op update that keeps the ADMIN role still works.
+        given().contentType("application/json")
+                .body("{ \"firstName\": \"Ada\", \"lastName\": \"Min\", \"email\": \"%s\", \"role\": \"ADMIN\" }"
+                        .formatted(mail))
+                .when().put(loc).then().statusCode(200).body("firstName", is("Ada"));
+    }
+
+    @Test
     void perProfileModuleGates() {
         long profileId = Long.parseLong(given().contentType("application/json")
                 .body("{ \"name\": \"Gate Test Co.\" }")

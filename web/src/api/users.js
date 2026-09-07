@@ -43,16 +43,24 @@ export async function listUsers({ q = '', sort = '', page = 1, size = 20 } = {})
   return { items: res.items.map(toUser), total: res.total }
 }
 
-export async function createUser({ firstName, lastName, email, contactNo, matrix = [] }) {
+export async function createUser({ firstName, lastName, email, contactNo, role = 'user', matrix = [] }) {
+  const isAdmin = ROLE_TO_API[role] === 'ADMIN'
   const u = await api.post('/api/v1/users', {
     firstName,
     lastName,
     email,
     phone: contactNo || null,
-    role: 'USER',
-    grants: grantsFrom(matrix),
+    role: ROLE_TO_API[role] || 'USER',
+    // Admins bypass the module matrix, so don't bother sending grants for one.
+    grants: isAdmin ? {} : grantsFrom(matrix),
   })
   return toUser(u)
+}
+
+// Promote to admin. Sends the user's existing profile fields (the API requires them).
+// Admin is one-way: the backend rejects any demotion.
+export async function setUserRole(id, user, role) {
+  return updateUserProfile(id, { ...user, role })
 }
 
 export async function updateUserProfile(id, { firstName, lastName, email, contactNo, role }) {

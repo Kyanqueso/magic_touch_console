@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react'
-import { Plus, UserPlus } from 'lucide-react'
+import { Plus, ShieldCheck, UserPlus } from 'lucide-react'
 import Modal from './Modal.jsx'
 import Button from './Button.jsx'
 import TextField from './TextField.jsx'
+import SegmentedTabs from './SegmentedTabs.jsx'
 import AccessToggle from './AccessToggle.jsx'
 import { maskPhone, sanitizeEmail, isEmail } from '../lib/masks.js'
 
 const EMPTY = { firstName: '', lastName: '', email: '', contactNo: '' }
+const ROLE_OPTIONS = [
+  { value: 'user', label: 'User' },
+  { value: 'admin', label: 'Admin' },
+]
 
 // `onAdd(data)` should return a promise; the modal closes once it resolves.
 // `modules` is [{ key, name }] from the backend.
 export default function AddUserModal({ open, onClose, onAdd, modules = [] }) {
   const [form, setForm] = useState(EMPTY)
+  const [role, setRole] = useState('user')
   const [matrix, setMatrix] = useState([])
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
@@ -19,6 +25,7 @@ export default function AddUserModal({ open, onClose, onAdd, modules = [] }) {
   useEffect(() => {
     if (open) {
       setForm(EMPTY)
+      setRole('user')
       setMatrix(modules.map((m) => ({ key: m.key, name: m.name, level: 'No Access' })))
       setErrors({})
       setLoading(false)
@@ -51,6 +58,7 @@ export default function AddUserModal({ open, onClose, onAdd, modules = [] }) {
         lastName: form.lastName.trim(),
         email: form.email.trim(),
         contactNo: form.contactNo.trim(),
+        role,
         matrix,
       })
       onClose()
@@ -58,6 +66,8 @@ export default function AddUserModal({ open, onClose, onAdd, modules = [] }) {
       setLoading(false)
     }
   }
+
+  const isAdmin = role === 'admin'
 
   return (
     <Modal
@@ -110,19 +120,43 @@ export default function AddUserModal({ open, onClose, onAdd, modules = [] }) {
         />
 
         <div>
-          <p className="mb-2 text-base font-bold text-content">Access per module</p>
-          <div className="space-y-2">
-            {matrix.map((m) => (
-              <div
-                key={m.key}
-                className="flex flex-col gap-2 rounded-lg border border-purple-light p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <span className="text-sm font-semibold text-content">{m.name}</span>
-                <AccessToggle value={m.level} onChange={(lvl) => setLevel(m.key, lvl)} />
-              </div>
-            ))}
-          </div>
+          <p className="mb-2 text-base font-bold text-content">Role</p>
+          <SegmentedTabs
+            full
+            value={role}
+            options={ROLE_OPTIONS}
+            disabled={loading}
+            onChange={setRole}
+          />
         </div>
+
+        {isAdmin ? (
+          <div className="flex items-start gap-2 rounded-lg border border-danger bg-danger-tooltip-bg px-3 py-2.5 text-sm text-content-muted">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+            <span>
+              Admins have full access to every module and can manage other users; the per-module
+              list does not apply.{' '}
+              <span className="font-bold text-danger">
+                This is permanent — an admin can't be demoted or deleted afterward.
+              </span>
+            </span>
+          </div>
+        ) : (
+          <div>
+            <p className="mb-2 text-base font-bold text-content">Access per module</p>
+            <div className="space-y-2">
+              {matrix.map((m) => (
+                <div
+                  key={m.key}
+                  className="flex flex-col gap-2 rounded-lg border border-purple-light p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <span className="text-sm font-semibold text-content">{m.name}</span>
+                  <AccessToggle value={m.level} onChange={(lvl) => setLevel(m.key, lvl)} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="dark" size="sm" onClick={onClose} disabled={loading}>
