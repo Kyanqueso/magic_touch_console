@@ -90,6 +90,61 @@ class CorporateProfileResourceTest extends AuthenticatedApiTest {
                 .body("items[0].registrations", nullValue());
     }
 
+    /** The list-card tags count what the profile's own tabs would show. */
+    @Test
+    void listCountsJobOrdersAndCustomers() {
+        String loc = given().contentType("application/json")
+                .body("{ \"name\": \"Counted Corp.\" }")
+                .when().post(BASE).then().statusCode(201).extract().header("Location");
+        long profileId = Long.parseLong(loc.substring(loc.lastIndexOf('/') + 1));
+
+        // Global customers are shared by every profile, so measure the change.
+        long customersBefore = countsFor("Counted Corp.").getLong("customerCount");
+
+        long customerId = given().contentType("application/json")
+                .body("{ \"scope\": \"LOCAL\", \"name\": \"Counted Customer\" }")
+                .when().post(BASE + "/" + profileId + "/customers")
+                .then().statusCode(201).extract().jsonPath().getLong("id");
+
+        given().contentType("application/json")
+                .body("{ \"customerId\": %d, \"jobDescription\": \"Counted job\" }".formatted(customerId))
+                .when().post(BASE + "/" + profileId + "/job-orders").then().statusCode(201);
+
+        var after = countsFor("Counted Corp.");
+        org.junit.jupiter.api.Assertions.assertEquals(1, after.getLong("jobOrderCount"));
+        org.junit.jupiter.api.Assertions.assertEquals(customersBefore + 1, after.getLong("customerCount"));
+    }
+
+    /** The card shows job orders when the module is on for the profile, suppliers when it is off. */
+    @Test
+    void listReportsSupplierCountAndWhetherJobOrdersAreOn() {
+        String loc = given().contentType("application/json")
+                .body("{ \"name\": \"Gated Corp.\" }")
+                .when().post(BASE).then().statusCode(201).extract().header("Location");
+        long profileId = Long.parseLong(loc.substring(loc.lastIndexOf('/') + 1));
+
+        // A fresh profile has no module rows, so job orders are off.
+        org.junit.jupiter.api.Assertions.assertFalse(countsFor("Gated Corp.").getBoolean("jobOrdersEnabled"));
+
+        long suppliersBefore = countsFor("Gated Corp.").getLong("supplierCount");
+        given().contentType("application/json")
+                .body("{ \"scope\": \"LOCAL\", \"name\": \"Gated Supplier\" }")
+                .when().post(BASE + "/" + profileId + "/suppliers").then().statusCode(201);
+        org.junit.jupiter.api.Assertions.assertEquals(
+                suppliersBefore + 1, countsFor("Gated Corp.").getLong("supplierCount"));
+
+        given().contentType("application/json")
+                .body("{ \"gates\": { \"job_orders\": true } }")
+                .when().put(BASE + "/" + profileId + "/modules").then().statusCode(200);
+        org.junit.jupiter.api.Assertions.assertTrue(countsFor("Gated Corp.").getBoolean("jobOrdersEnabled"));
+    }
+
+    private static io.restassured.path.json.JsonPath countsFor(String name) {
+        String body = given().when().get(BASE + "?q=" + name.split(" ")[0])
+                .then().statusCode(200).extract().asString();
+        return io.restassured.path.json.JsonPath.from(body).setRootPath("items.find { it.name == '" + name + "' }");
+    }
+
     @Test
     void archiveRestoreDeleteLifecycle() {
         String location = given().contentType("application/json")

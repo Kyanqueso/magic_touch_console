@@ -24,8 +24,12 @@ import Loading from './Loading.jsx'
 import CompanyFormModal from './CompanyFormModal.jsx'
 import ConfirmDialog from './ConfirmDialog.jsx'
 import ActionConfirmDialog, { actionAlert } from './ActionConfirmDialog.jsx'
+import EditableCell from './EditableCell.jsx'
+import EditBar from './EditBar.jsx'
+import LeaveEditDialog from './LeaveEditDialog.jsx'
 import useTableEdit from '../hooks/useTableEdit.js'
 import useAutoAlert from '../hooks/useAutoAlert.js'
+import { validatePartyRow } from '../lib/validate.js'
 import {
   listParties,
   createParty,
@@ -107,7 +111,20 @@ export default function EntityListPage({
     setSelected(new Set())
     setAlert({ variant: 'success', title: 'Changes saved.' })
     reload()
-  })
+  }, validatePartyRow)
+
+  // Leaving mid-edit throws the draft away, so ask first.
+  const [leaveTo, setLeaveTo] = useState(null)
+  function guard(action) {
+    if (edit.dirty) setLeaveTo(() => action)
+    else action()
+  }
+  function confirmLeave() {
+    const action = leaveTo
+    setLeaveTo(null)
+    edit.cancel()
+    action?.()
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -249,30 +266,17 @@ export default function EntityListPage({
           <SegmentedTabs
             value={tab}
             options={TABS}
-            disabled={edit.editing}
-            onChange={reset(setTab)}
+            onChange={(v) => guard(() => reset(setTab)(v))}
           />
 
           {tab === 'active' &&
             (edit.editing ? (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setConfirmUndo(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-danger px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-danger-hover"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Undo All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmSave(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-info px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-info-hover"
-                >
-                  <Save className="h-4 w-4" />
-                  Save Changes
-                </button>
-              </div>
+              <EditBar
+                errorCount={edit.errorCount}
+                saving={edit.saving}
+                onUndo={() => setConfirmUndo(true)}
+                onSave={() => setConfirmSave(true)}
+              />
             ) : (
               <button
                 type="button"
@@ -409,12 +413,17 @@ export default function EntityListPage({
                       </td>
                     )}
                     {columns.map((c) => (
-                      <td key={c.key} className="whitespace-nowrap px-3 py-2 text-content">
+                      <td
+                        key={c.key}
+                        className={`px-3 py-2 align-top text-content ${
+                          edit.editing ? '' : 'whitespace-nowrap'
+                        }`}
+                      >
                         {edit.editing && !READONLY_KEYS.has(c.key) ? (
-                          <input
-                            value={r[c.key] ?? ''}
-                            onChange={(e) => edit.setCell(r.id, c.key, e.target.value)}
-                            className="w-full min-w-24 rounded border border-purple-light bg-white px-2 py-1 text-sm outline-none focus:border-purple focus:ring-1 focus:ring-purple-light"
+                          <EditableCell
+                            value={r[c.key]}
+                            error={edit.errorsFor(r.id)[c.key]}
+                            onChange={(v) => edit.setCell(r.id, c.key, v)}
                           />
                         ) : c.key === 'scope' ? (
                           <ScopeBadge scope={r[c.key]} />
@@ -481,6 +490,12 @@ export default function EntityListPage({
         submitLabel="Add"
         scopeLocked={!profileId}
         entityLabel={detailNoun}
+      />
+
+      <LeaveEditDialog
+        open={Boolean(leaveTo)}
+        onClose={() => setLeaveTo(null)}
+        onConfirm={confirmLeave}
       />
 
       <ActionConfirmDialog

@@ -10,10 +10,20 @@ public record CorporateProfileSummary(
         String name,
         String status,
         boolean archived,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        // Counts match what the profile's own tabs show: its Local rows plus the
+        // shared Global ones. The card shows job orders when that module is on
+        // for this profile, and suppliers when it is off.
+        boolean jobOrdersEnabled,
+        long jobOrderCount,
+        long customerCount,
+        long supplierCount
 ) {
 
-    public static CorporateProfileSummary from(CorporateProfile p) {
-        return new CorporateProfileSummary(p.id, p.name, p.status(), p.isArchived(), p.createdAt);
+    public static CorporateProfileSummary from(CorporateProfile p, boolean jobOrdersEnabled,
+                                               long jobOrders, long customers, long suppliers) {
+        return new CorporateProfileSummary(
+                p.id, p.name, p.status(), p.isArchived(), p.createdAt,
+                jobOrdersEnabled, jobOrders, customers, suppliers);
     }
 }

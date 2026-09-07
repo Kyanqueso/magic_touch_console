@@ -4,6 +4,10 @@ import com.magictouch.console.common.error.ApiException;
 import com.magictouch.console.common.page.PageQuery;
 import com.magictouch.console.common.page.PageResponse;
 import com.magictouch.console.common.page.SortSpec;
+import com.magictouch.console.access.data.CorporateProfileModuleRepository;
+import com.magictouch.console.directory.data.CustomerRepository;
+import com.magictouch.console.directory.data.SupplierRepository;
+import com.magictouch.console.joborders.data.JobOrderRepository;
 import com.magictouch.console.profiles.api.dto.CorporateProfileRequest;
 import com.magictouch.console.profiles.api.dto.CorporateProfileResponse;
 import com.magictouch.console.profiles.api.dto.CorporateProfileSummary;
@@ -21,27 +25,59 @@ import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @ApplicationScoped
 public class CorporateProfileService {
 
     private static final Map<String, String> SORTABLE = Map.of("name", "name", "createdAt", "createdAt");
     private static final Sort DEFAULT_SORT = Sort.by("createdAt", Sort.Direction.Descending);
+    private static final String JOB_ORDERS_MODULE = "job_orders";
 
     private final CorporateProfileRepository repo;
     private final EntityManager em;
+    // Cross-module, for the list-card tags only.
+    private final JobOrderRepository jobOrders;
+    private final CustomerRepository customers;
+    private final SupplierRepository suppliers;
+    private final CorporateProfileModuleRepository profileModules;
 
-    public CorporateProfileService(CorporateProfileRepository repo, EntityManager em) {
+    public CorporateProfileService(CorporateProfileRepository repo, EntityManager em,
+                                   JobOrderRepository jobOrders, CustomerRepository customers,
+                                   SupplierRepository suppliers,
+                                   CorporateProfileModuleRepository profileModules) {
         this.repo = repo;
         this.em = em;
+        this.jobOrders = jobOrders;
+        this.customers = customers;
+        this.suppliers = suppliers;
+        this.profileModules = profileModules;
     }
 
     public PageResponse<CorporateProfileSummary> list(PageQuery page, String sort, String q, boolean archived) {
         Sort s = SortSpec.parse(sort, SORTABLE, DEFAULT_SORT);
         PanacheQuery<CorporateProfile> query = repo.search(archived, q, s);
         long total = query.count();
-        List<CorporateProfileSummary> items = query.page(page.index(), page.size())
-                .list().stream().map(CorporateProfileSummary::from).toList();
+        List<CorporateProfile> rows = query.page(page.index(), page.size()).list();
+
+        // Counts for the cards: a handful of grouped queries for the page rather
+        // than a few per row.
+        List<Long> ids = rows.stream().map(p -> p.id).toList();
+        Map<Long, Long> jobOrderCounts = jobOrders.activeCountsByProfile(ids);
+        Map<Long, Long> localCustomers = customers.activeLocalCountsByProfile(ids);
+        Map<Long, Long> localSuppliers = suppliers.activeLocalCountsByProfile(ids);
+        long globalCustomers = ids.isEmpty() ? 0 : customers.activeGlobalCount();
+        long globalSuppliers = ids.isEmpty() ? 0 : suppliers.activeGlobalCount();
+        Set<Long> jobOrdersOn = profileModules.enabledFor(ids, JOB_ORDERS_MODULE);
+
+        List<CorporateProfileSummary> items = rows.stream()
+                .map(p -> CorporateProfileSummary.from(
+                        p,
+                        jobOrdersOn.contains(p.id),
+                        jobOrderCounts.getOrDefault(p.id, 0L),
+                        localCustomers.getOrDefault(p.id, 0L) + globalCustomers,
+                        localSuppliers.getOrDefault(p.id, 0L) + globalSuppliers))
+                .toList();
         return PageResponse.of(items, page, total);
     }
 

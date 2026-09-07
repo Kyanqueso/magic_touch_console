@@ -22,6 +22,9 @@ import EmptyState from '../components/EmptyState.jsx'
 import AddMaterialModal from '../components/AddMaterialModal.jsx'
 import NumberField from '../components/NumberField.jsx'
 import Loading from '../components/Loading.jsx'
+import EditableCell from '../components/EditableCell.jsx'
+import LeaveEditDialog from '../components/LeaveEditDialog.jsx'
+import { validateMaterialRow, validateRows, countErrors } from '../lib/validate.js'
 import useAutoAlert from '../hooks/useAutoAlert.js'
 import { peso } from '../lib/format.js'
 import {
@@ -123,6 +126,8 @@ export default function MaterialsPage() {
   const [editLoadingId, setEditLoadingId] = useState(null)
   const [draft, setDraft] = useState([])
   const [history, setHistory] = useState([])
+  const [snapshot, setSnapshot] = useState([])
+  const [leaveTo, setLeaveTo] = useState(null)
   const [confirmUndo, setConfirmUndo] = useState(false)
   const [confirmSave, setConfirmSave] = useState(false)
 
@@ -176,12 +181,42 @@ export default function MaterialsPage() {
     })
   }
 
+  // Live per-row validation: flags a missing code or a bad price as it is typed
+  // rather than letting Save bounce off the API.
+  const errors = useMemo(
+    () => (editingId ? validateRows(draft, validateMaterialRow) : {}),
+    [draft, editingId],
+  )
+  const errorCount = countErrors(errors)
+
+  const dirty =
+    Boolean(editingId) &&
+    (draft.length !== snapshot.length ||
+      draft.some((r) => {
+        const was = snapshot.find((s) => s.id === r.id)
+        return !was || Object.keys(r).some((k) => r[k] !== was[k])
+      }))
+
+  // Leaving mid-edit throws the draft away, so ask first.
+  function guard(action) {
+    if (dirty) setLeaveTo(() => action)
+    else action()
+  }
+  function confirmLeave() {
+    const action = leaveTo
+    setLeaveTo(null)
+    exitEdit()
+    action?.()
+  }
+
   function startEdit(groupId) {
     if (editingId) return
+    const rows = materials
+      .filter((m) => m.groupId === groupId && !m.archived)
+      .map((m) => ({ ...m }))
     setEditingId(groupId)
-    setDraft(
-      materials.filter((m) => m.groupId === groupId && !m.archived).map((m) => ({ ...m })),
-    )
+    setDraft(rows)
+    setSnapshot(rows.map((r) => ({ ...r })))
     setHistory([])
     setExpanded((prev) => new Set(prev).add(groupId))
   }
@@ -192,6 +227,7 @@ export default function MaterialsPage() {
   function exitEdit() {
     setEditingId(null)
     setDraft([])
+    setSnapshot([])
     setHistory([])
   }
 
@@ -206,6 +242,7 @@ export default function MaterialsPage() {
   }
 
   async function saveChanges() {
+    if (errorCount > 0) return
     const snapshot = materials.filter((m) => m.groupId === editingId)
     const removedIds = snapshot
       .filter((s) => !draft.some((d) => d.id === s.id))
@@ -301,10 +338,12 @@ export default function MaterialsPage() {
           <SegmentedTabs
             value={tab}
             options={TABS}
-            onChange={(v) => {
-              setTab(v)
-              exitEdit()
-            }}
+            onChange={(v) =>
+              guard(() => {
+                setTab(v)
+                exitEdit()
+              })
+            }
           />
         </div>
 
@@ -325,6 +364,11 @@ export default function MaterialsPage() {
 
                   {editing ? (
                     <>
+                      {errorCount > 0 && (
+                        <span className="rounded bg-danger px-2 py-1 text-xs font-bold">
+                          {errorCount === 1 ? '1 field needs fixing' : `${errorCount} fields need fixing`}
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => setConfirmUndo(true)}
@@ -335,7 +379,9 @@ export default function MaterialsPage() {
                       <button
                         type="button"
                         onClick={() => setConfirmSave(true)}
-                        className="rounded-md bg-info px-3 py-1.5 text-xs font-bold transition-colors hover:bg-info-hover"
+                        disabled={errorCount > 0}
+                        title={errorCount > 0 ? 'Fix the highlighted fields first.' : undefined}
+                        className="rounded-md bg-info px-3 py-1.5 text-xs font-bold transition-colors hover:bg-info-hover disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Save Changes
                       </button>
@@ -423,6 +469,7 @@ export default function MaterialsPage() {
                         rows={rows}
                         editing={editing}
                         tab={tab}
+                        errors={errors}
                         onCell={updateCell}
                         onRemove={(row) => removeDraftRow(row.id)}
                         onArchive={(row) =>
@@ -450,6 +497,7 @@ export default function MaterialsPage() {
                             row={row}
                             editing={editing}
                             tab={tab}
+                            errors={errors[row.id] || {}}
                             onCell={updateCell}
                             onRemove={() => removeDraftRow(row.id)}
                             onArchive={() =>
@@ -508,6 +556,12 @@ export default function MaterialsPage() {
         groups={groups}
       />
 
+      <LeaveEditDialog
+        open={Boolean(leaveTo)}
+        onClose={() => setLeaveTo(null)}
+        onConfirm={confirmLeave}
+      />
+
       <ActionConfirmDialog
         open={Boolean(pending)}
         onClose={() => setPending(null)}
@@ -553,7 +607,7 @@ export default function MaterialsPage() {
   )
 }
 
-function MaterialTable({ rows, editing, tab, onCell, onRemove, onArchive, onRestore, onDelete, onEdit }) {
+function MaterialTable({ rows, editing, tab, errors = {}, onCell, onRemove, onArchive, onRestore, onDelete, onEdit }) {
   const input =
     'w-full rounded border border-purple-light bg-white px-2 py-1 text-sm outline-none focus:border-purple focus:ring-1 focus:ring-purple-light'
 
@@ -579,10 +633,11 @@ function MaterialTable({ rows, editing, tab, onCell, onRemove, onArchive, onRest
             <tr key={row.id} className="align-top">
               <td className="px-5 py-2">
                 {editing ? (
-                  <input
+                  <EditableCell
                     value={row.code}
-                    onChange={(e) => onCell(row.id, 'code', e.target.value)}
-                    className={`${input} font-bold`}
+                    error={errors[row.id]?.code}
+                    className="font-bold"
+                    onChange={(v) => onCell(row.id, 'code', v)}
                   />
                 ) : (
                   <span className="font-bold text-content">{row.code}</span>
@@ -590,10 +645,10 @@ function MaterialTable({ rows, editing, tab, onCell, onRemove, onArchive, onRest
               </td>
               <td className="px-3 py-2">
                 {editing ? (
-                  <input
+                  <EditableCell
                     value={row.description}
-                    onChange={(e) => onCell(row.id, 'description', e.target.value)}
-                    className={input}
+                    error={errors[row.id]?.description}
+                    onChange={(v) => onCell(row.id, 'description', v)}
                   />
                 ) : (
                   <span className="text-content">{row.description || '—'}</span>
@@ -608,6 +663,7 @@ function MaterialTable({ rows, editing, tab, onCell, onRemove, onArchive, onRest
                     step={0.25}
                     wrapperClassName="w-28"
                     value={row.unitPrice}
+                    error={errors[row.id]?.unitPrice}
                     onChange={(v) => onCell(row.id, 'unitPrice', v)}
                   />
                 ) : (
@@ -673,21 +729,23 @@ function MaterialTable({ rows, editing, tab, onCell, onRemove, onArchive, onRest
   )
 }
 
-function MaterialRow({ row, editing, tab, onCell, onRemove, onArchive, onRestore, onDelete, onEdit }) {
+function MaterialRow({ row, editing, tab, errors = {}, onCell, onRemove, onArchive, onRestore, onDelete, onEdit }) {
   if (editing) {
     return (
-      <div className="flex flex-wrap items-center gap-3 px-5 py-3">
-        <input
+      <div className="flex flex-wrap items-start gap-3 px-5 py-3">
+        <EditableCell
           value={row.code}
-          onChange={(e) => onCell(row.id, 'code', e.target.value)}
+          error={errors.code}
           placeholder="Code"
-          className="w-32 rounded border border-purple-light bg-white px-2 py-1 text-sm font-bold outline-none focus:border-purple"
+          className="font-bold"
+          onChange={(v) => onCell(row.id, 'code', v)}
         />
-        <input
+        <EditableCell
           value={row.description}
-          onChange={(e) => onCell(row.id, 'description', e.target.value)}
+          error={errors.description}
           placeholder="Description"
-          className="min-w-40 flex-1 rounded border border-purple-light bg-white px-2 py-1 text-sm outline-none focus:border-purple"
+          className="min-w-40"
+          onChange={(v) => onCell(row.id, 'description', v)}
         />
         <NumberField
           size="sm"
@@ -696,6 +754,7 @@ function MaterialRow({ row, editing, tab, onCell, onRemove, onArchive, onRestore
           step={0.25}
           wrapperClassName="w-28"
           value={row.unitPrice}
+          error={errors.unitPrice}
           onChange={(v) => onCell(row.id, 'unitPrice', v)}
         />
         <button

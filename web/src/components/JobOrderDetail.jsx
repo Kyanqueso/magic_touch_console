@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Archive,
   ArrowLeft,
@@ -24,6 +24,9 @@ import NumberField from './NumberField.jsx'
 import NoteField from './NoteField.jsx'
 import ConfirmDialog from './ConfirmDialog.jsx'
 import JobOrderSummary from './JobOrderSummary.jsx'
+import LeaveEditDialog from './LeaveEditDialog.jsx'
+import { FieldError } from './EditableCell.jsx'
+import { validateJobOrderDetail } from '../lib/validate.js'
 import { peso, formatDate } from '../lib/format.js'
 import { printDocument } from '../lib/print.js'
 import { blankMaterial, saveJobOrderDraft } from '../api/jobOrders.js'
@@ -149,7 +152,16 @@ export default function JobOrderDetail({
     setDraft(job)
   }
 
+  // Live validation while editing, so a bad delivery date shows up here rather
+  // than as a rejected save.
+  const errors = useMemo(
+    () => (editing ? validateJobOrderDetail(draft) : {}),
+    [draft, editing],
+  )
+  const errorCount = Object.keys(errors).length
+
   async function saveEdit() {
+    if (errorCount > 0) return
     setSaving(true)
     try {
       const fresh = await saveJobOrderDraft(profileId, draft, job.materials || [])
@@ -161,6 +173,20 @@ export default function JobOrderDetail({
     } finally {
       setSaving(false)
     }
+  }
+
+  // Leaving mid-edit throws the draft away, so ask first.
+  const [leaveTo, setLeaveTo] = useState(null)
+  const dirty = editing && history.length > 0
+  function guard(action) {
+    if (dirty) setLeaveTo(() => action)
+    else action()
+  }
+  function confirmLeave() {
+    const action = leaveTo
+    setLeaveTo(null)
+    exitEdit()
+    action?.()
   }
 
   function setField(key, value) {
@@ -260,7 +286,7 @@ export default function JobOrderDetail({
         <div className="flex items-start gap-3">
           <button
             type="button"
-            onClick={onBack}
+            onClick={() => guard(onBack)}
             aria-label="Back"
             className="mt-1 shrink-0 rounded-md p-1 text-content transition-colors hover:bg-white"
           >
@@ -297,11 +323,17 @@ export default function JobOrderDetail({
                 size="sm"
                 onClick={() => setConfirmSave(true)}
                 loading={saving}
-                disabled={saving}
+                disabled={saving || errorCount > 0}
+                title={errorCount > 0 ? 'Fix the highlighted fields first.' : undefined}
               >
                 <Save className="h-4 w-4" />
                 Save Changes
               </Button>
+              {errorCount > 0 && (
+                <span className="self-center text-sm font-semibold text-danger">
+                  {errorCount === 1 ? '1 field needs fixing' : `${errorCount} fields need fixing`}
+                </span>
+              )}
             </>
           ) : (
             <>
@@ -346,9 +378,9 @@ export default function JobOrderDetail({
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
-        <Card icon={ClipboardList} title="Job Overview" fields={OVERVIEW} data={view} editing={editable} onField={setField} />
-        <Card icon={ClipboardList} title="Order Details" fields={ORDER} data={view} editing={editable} onField={setField} />
-        <Card icon={Coins} title="Quantity and Pricing" fields={PRICING} data={view} editing={editable} onField={setField} />
+        <Card icon={ClipboardList} title="Job Overview" fields={OVERVIEW} data={view} editing={editable} errors={errors} onField={setField} />
+        <Card icon={ClipboardList} title="Order Details" fields={ORDER} data={view} editing={editable} errors={errors} onField={setField} />
+        <Card icon={Coins} title="Quantity and Pricing" fields={PRICING} data={view} editing={editable} errors={errors} onField={setField} />
       </div>
 
       {/* Materials */}
@@ -510,6 +542,12 @@ export default function JobOrderDetail({
         </p>
       )}
 
+      <LeaveEditDialog
+        open={Boolean(leaveTo)}
+        onClose={() => setLeaveTo(null)}
+        onConfirm={confirmLeave}
+      />
+
       <ConfirmDialog
         open={confirmUndo}
         onClose={() => setConfirmUndo(false)}
@@ -572,7 +610,7 @@ export default function JobOrderDetail({
   )
 }
 
-function Card({ icon: Icon, title, fields, data, editing, onField }) {
+function Card({ icon: Icon, title, fields, data, editing, errors = {}, onField }) {
   return (
     <div className="rounded-xl border border-purple-light bg-white p-5">
       <div className="mb-4 flex items-center gap-2">
@@ -594,12 +632,16 @@ function Card({ icon: Icon, title, fields, data, editing, onField }) {
               {label}
             </span>
             {editing ? (
-              <FieldInput
-                type={type}
-                value={data[key]}
-                options={list}
-                onChange={(v) => onField(key, v)}
-              />
+              <>
+                <FieldInput
+                  type={type}
+                  value={data[key]}
+                  options={list}
+                  error={errors[key]}
+                  onChange={(v) => onField(key, v)}
+                />
+                {errors[key] && <FieldError>{errors[key]}</FieldError>}
+              </>
             ) : (
               <span className="text-sm text-content-muted">{display(data[key], type)}</span>
             )}
@@ -610,9 +652,12 @@ function Card({ icon: Icon, title, fields, data, editing, onField }) {
   )
 }
 
-function FieldInput({ type, value, options, onChange }) {
-  const cls =
-    'block w-full rounded-lg border border-purple-light bg-white px-3 py-2 text-sm text-content outline-none focus:border-purple focus:ring-2 focus:ring-purple-light'
+function FieldInput({ type, value, options, error, onChange }) {
+  const cls = `block w-full rounded-lg border bg-white px-3 py-2 text-sm text-content outline-none focus:ring-2 ${
+    error
+      ? 'border-danger focus:border-danger focus:ring-danger/30'
+      : 'border-purple-light focus:border-purple focus:ring-purple-light'
+  }`
   if (type === 'select') {
     return (
       <Select
@@ -622,6 +667,7 @@ function FieldInput({ type, value, options, onChange }) {
         value={value}
         onChange={onChange}
         options={opt(options)}
+        invalid={Boolean(error)}
       />
     )
   }
@@ -634,11 +680,12 @@ function FieldInput({ type, value, options, onChange }) {
         value={value ?? ''}
         onChange={onChange}
         options={options}
+        invalid={Boolean(error)}
       />
     )
   }
   if (type === 'date') {
-    return <DateField size="sm" value={value ?? ''} onChange={onChange} />
+    return <DateField size="sm" value={value ?? ''} onChange={onChange} invalid={Boolean(error)} />
   }
   if (type === 'number' || type === 'peso') {
     return (
@@ -648,11 +695,18 @@ function FieldInput({ type, value, options, onChange }) {
         min={0}
         value={value ?? ''}
         onChange={onChange}
+        invalid={Boolean(error)}
       />
     )
   }
   return (
-    <input type="text" value={value ?? ''} onChange={(e) => onChange(e.target.value)} className={cls} />
+    <input
+      type="text"
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value)}
+      aria-invalid={error ? true : undefined}
+      className={cls}
+    />
   )
 }
 

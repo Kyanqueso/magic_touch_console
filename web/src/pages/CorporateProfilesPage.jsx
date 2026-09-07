@@ -38,6 +38,8 @@ function errMessage(e) {
   return e?.message || 'Something went wrong.'
 }
 
+const plural = (n, noun) => `${n} ${noun}${n === 1 ? '' : 's'}`
+
 export default function CorporateProfilesPage() {
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -110,9 +112,16 @@ export default function CorporateProfilesPage() {
     setProfileSection('details')
   }
 
+  // Reload on the way out: the cards count job orders and customers, and the
+  // user may well have just added some inside the profile.
+  function closeProfile() {
+    setSelectedId(null)
+    reload()
+  }
+
   const profileNav = selected
     ? [
-        { label: 'Corporate Profiles', onClick: () => setSelectedId(null) },
+        { label: 'Corporate Profiles', onClick: closeProfile },
         {
           label: 'Customers',
           onClick: () => setProfileSection('customers'),
@@ -235,7 +244,7 @@ export default function CorporateProfilesPage() {
         <CorporateProfileDetail
           profile={selected}
           section={profileSection}
-          onBack={() => setSelectedId(null)}
+          onBack={closeProfile}
           onExitSection={() => setProfileSection('details')}
           onSave={(data) => handleSaveDetails(selected.id, data)}
           onArchive={() => setArchiveTarget(selected)}
@@ -428,8 +437,15 @@ function ProfileCard({ profile, restoring, onOpen, onArchive, onRestore, onDelet
 
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Tag>Added {formatDate(profile.addedAt)}</Tag>
-        {!isArchived && <Tag>{profile.customers} customers</Tag>}
-        {!isArchived && <Tag>{profile.jobOrders} Job Orders</Tag>}
+        {!isArchived && <Tag>{plural(profile.customers, 'customer')}</Tag>}
+        {/* Job orders only mean something when the module is on for this profile. */}
+        {!isArchived && (
+          <Tag>
+            {profile.jobOrdersEnabled
+              ? plural(profile.jobOrders, 'job order')
+              : plural(profile.suppliers, 'supplier')}
+          </Tag>
+        )}
       </div>
     </div>
   )

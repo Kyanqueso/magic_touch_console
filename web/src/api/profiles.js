@@ -14,9 +14,10 @@ function toCard(row) {
     status: STATUS_LABEL[row.status] || row.status,
     addedAt: (row.createdAt || '').slice(0, 10), // date part only, for formatDate
     archived: row.archived,
-    // counts come from other modules; not wired yet
-    customers: 0,
-    jobOrders: 0,
+    jobOrdersEnabled: Boolean(row.jobOrdersEnabled),
+    customers: row.customerCount ?? 0,
+    jobOrders: row.jobOrderCount ?? 0,
+    suppliers: row.supplierCount ?? 0,
   }
 }
 

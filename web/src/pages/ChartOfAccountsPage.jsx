@@ -21,8 +21,11 @@ import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import ActionConfirmDialog, { actionAlert } from '../components/ActionConfirmDialog.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import Loading from '../components/Loading.jsx'
+import EditableCell from '../components/EditableCell.jsx'
+import LeaveEditDialog from '../components/LeaveEditDialog.jsx'
 import useAutoAlert from '../hooks/useAutoAlert.js'
 import { maskPercent } from '../lib/masks.js'
+import { validateAccountRow, validateRows, countErrors } from '../lib/validate.js'
 import {
   listCategories,
   listAccounts,
@@ -149,6 +152,36 @@ export default function ChartOfAccountsPage() {
   const [editLoadingId, setEditLoadingId] = useState(null)
   const [draft, setDraft] = useState([])
   const [history, setHistory] = useState([])
+  const [snapshot, setSnapshot] = useState([])
+  const [leaveTo, setLeaveTo] = useState(null)
+
+  // Live per-row validation: flags a bad code or rate as it is typed rather
+  // than letting Save bounce off the API.
+  const errors = useMemo(
+    () => (editingId ? validateRows(draft, validateAccountRow) : {}),
+    [draft, editingId],
+  )
+  const errorCount = countErrors(errors)
+
+  const dirty =
+    Boolean(editingId) &&
+    (draft.length !== snapshot.length ||
+      draft.some((r) => {
+        const was = snapshot.find((s) => s.id === r.id)
+        return !was || Object.keys(r).some((k) => r[k] !== was[k])
+      }))
+
+  // Leaving mid-edit throws the draft away, so ask first.
+  function guard(action) {
+    if (dirty) setLeaveTo(() => action)
+    else action()
+  }
+  function confirmLeave() {
+    const action = leaveTo
+    setLeaveTo(null)
+    exitEdit()
+    action?.()
+  }
 
   function undo() {
     if (!history.length) return
@@ -201,12 +234,12 @@ export default function ChartOfAccountsPage() {
 
   function startEdit(categoryId) {
     if (editingId) return
+    const rows = accounts
+      .filter((a) => a.categoryId === categoryId && !a.archived)
+      .map((a) => ({ ...a }))
     setEditingId(categoryId)
-    setDraft(
-      accounts
-        .filter((a) => a.categoryId === categoryId && !a.archived)
-        .map((a) => ({ ...a })),
-    )
+    setDraft(rows)
+    setSnapshot(rows.map((r) => ({ ...r })))
     setHistory([])
     setExpanded((prev) => new Set(prev).add(categoryId))
   }
@@ -217,6 +250,7 @@ export default function ChartOfAccountsPage() {
   function exitEdit() {
     setEditingId(null)
     setDraft([])
+    setSnapshot([])
     setHistory([])
   }
 
@@ -231,6 +265,7 @@ export default function ChartOfAccountsPage() {
   }
 
   async function saveChanges() {
+    if (errorCount > 0) return
     const snapshot = accounts.filter((a) => a.categoryId === editingId)
     const removedIds = snapshot
       .filter((s) => !draft.some((d) => d.id === s.id))
@@ -338,10 +373,12 @@ export default function ChartOfAccountsPage() {
           <SegmentedTabs
             value={tab}
             options={TABS}
-            onChange={(v) => {
-              setTab(v)
-              exitEdit()
-            }}
+            onChange={(v) =>
+              guard(() => {
+                setTab(v)
+                exitEdit()
+              })
+            }
           />
 
           {tab === 'active' && (
@@ -374,6 +411,11 @@ export default function ChartOfAccountsPage() {
 
                   {editing ? (
                     <>
+                      {errorCount > 0 && (
+                        <span className="rounded bg-danger px-2 py-1 text-xs font-bold">
+                          {errorCount === 1 ? '1 field needs fixing' : `${errorCount} fields need fixing`}
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => setConfirmUndo(true)}
@@ -384,7 +426,9 @@ export default function ChartOfAccountsPage() {
                       <button
                         type="button"
                         onClick={() => setConfirmSave(true)}
-                        className="rounded-md bg-info px-3 py-1.5 text-xs font-bold transition-colors hover:bg-info-hover"
+                        disabled={errorCount > 0}
+                        title={errorCount > 0 ? 'Fix the highlighted fields first.' : undefined}
+                        className="rounded-md bg-info px-3 py-1.5 text-xs font-bold transition-colors hover:bg-info-hover disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Save Changes
                       </button>
@@ -472,6 +516,7 @@ export default function ChartOfAccountsPage() {
                         rows={rows}
                         editing={editing}
                         tab={tab}
+                        errors={errors}
                         onCell={updateCell}
                         onRowAction={rowAction}
                         onRowDelete={rowDelete}
@@ -482,6 +527,7 @@ export default function ChartOfAccountsPage() {
                         rows={rows}
                         editing={editing}
                         tab={tab}
+                        errors={errors}
                         onCell={updateCell}
                         onRowAction={rowAction}
                         onRowDelete={rowDelete}
@@ -559,6 +605,12 @@ export default function ChartOfAccountsPage() {
         <p>Save your changes to this category?</p>
       </ConfirmDialog>
 
+      <LeaveEditDialog
+        open={Boolean(leaveTo)}
+        onClose={() => setLeaveTo(null)}
+        onConfirm={confirmLeave}
+      />
+
       <ActionConfirmDialog
         open={Boolean(pending)}
         onClose={() => setPending(null)}
@@ -576,7 +628,7 @@ export default function ChartOfAccountsPage() {
   )
 }
 
-function AccountTable({ rows, editing, tab, onCell, onRowAction, onRowDelete }) {
+function AccountTable({ rows, editing, tab, errors = {}, onCell, onRowAction, onRowDelete }) {
   return (
     <table className="w-full min-w-[760px] text-sm">
       <thead>
@@ -605,10 +657,10 @@ function AccountTable({ rows, editing, tab, onCell, onRowAction, onRowDelete }) 
               {COLUMNS.map((c) => (
                 <td key={c.key} className="px-3 py-2">
                   {editing ? (
-                    <input
-                      value={row[c.key] ?? ''}
-                      onChange={(e) => onCell(row.id, c.key, maskCell(c.key, e.target.value))}
-                      className="w-full min-w-24 rounded border border-purple-light bg-white px-2 py-1 text-sm outline-none focus:border-purple focus:ring-1 focus:ring-purple-light"
+                    <EditableCell
+                      value={row[c.key]}
+                      error={errors[row.id]?.[c.key]}
+                      onChange={(v) => onCell(row.id, c.key, maskCell(c.key, v))}
                     />
                   ) : (
                     <span className="text-content">{row[c.key] || '—'}</span>
@@ -631,7 +683,7 @@ function AccountTable({ rows, editing, tab, onCell, onRowAction, onRowDelete }) 
   )
 }
 
-function AccountCards({ rows, editing, tab, onCell, onRowAction, onRowDelete, onEdit }) {
+function AccountCards({ rows, editing, tab, errors = {}, onCell, onRowAction, onRowDelete, onEdit }) {
   if (rows.length === 0) {
     return <p className="px-5 py-6 text-center text-sm text-content-muted">No accounts.</p>
   }
@@ -659,12 +711,12 @@ function AccountCards({ rows, editing, tab, onCell, onRowAction, onRowDelete, on
               {editing ? (
                 <div className="space-y-2">
                   {COLUMNS.map((c) => (
-                    <input
+                    <EditableCell
                       key={c.key}
-                      value={row[c.key] ?? ''}
-                      onChange={(e) => onCell(row.id, c.key, maskCell(c.key, e.target.value))}
+                      value={row[c.key]}
+                      error={errors[row.id]?.[c.key]}
                       placeholder={c.label}
-                      className="w-full rounded border border-purple-light bg-white px-2 py-1 text-sm outline-none focus:border-purple"
+                      onChange={(v) => onCell(row.id, c.key, maskCell(c.key, v))}
                     />
                   ))}
                   <div className="flex justify-end">

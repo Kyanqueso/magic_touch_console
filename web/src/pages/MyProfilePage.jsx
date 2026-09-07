@@ -20,6 +20,7 @@ import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import ActionConfirmDialog, { actionAlert } from '../components/ActionConfirmDialog.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import Loading from '../components/Loading.jsx'
+import LeaveEditDialog from '../components/LeaveEditDialog.jsx'
 import ResetPasswordModal from '../components/ResetPasswordModal.jsx'
 import AddUserModal from '../components/AddUserModal.jsx'
 import AccessToggle from '../components/AccessToggle.jsx'
@@ -299,6 +300,7 @@ function UserAccessPanel({ userId, onBack, onSaved, onError }) {
   const [draft, setDraft] = useState([])
   const [history, setHistory] = useState([])
   const [saving, setSaving] = useState(false)
+  const [leaveTo, setLeaveTo] = useState(null)
   const [confirmUndo, setConfirmUndo] = useState(false)
   const [confirmSave, setConfirmSave] = useState(false)
 
@@ -346,6 +348,19 @@ function UserAccessPanel({ userId, onBack, onSaved, onError }) {
     setHistory([])
   }
 
+  // Leaving mid-edit throws the draft away, so ask first.
+  const dirty = editing && history.length > 0
+  function guard(action) {
+    if (dirty) setLeaveTo(() => action)
+    else action()
+  }
+  function confirmLeave() {
+    const action = leaveTo
+    setLeaveTo(null)
+    exitEdit()
+    action?.()
+  }
+
   function setLevel(key, level) {
     setHistory((h) => [...h, draft])
     setDraft((d) => d.map((r) => (r.key === key ? { ...r, level } : r)))
@@ -377,7 +392,7 @@ function UserAccessPanel({ userId, onBack, onSaved, onError }) {
       <div className="flex items-start gap-3">
         <button
           type="button"
-          onClick={onBack}
+          onClick={() => guard(onBack)}
           aria-label="Back"
           className="mt-1 rounded-md p-1 text-content transition-colors hover:bg-white"
         >
@@ -443,6 +458,12 @@ function UserAccessPanel({ userId, onBack, onSaved, onError }) {
           change, or use Undo&nbsp;All.
         </p>
       )}
+
+      <LeaveEditDialog
+        open={Boolean(leaveTo)}
+        onClose={() => setLeaveTo(null)}
+        onConfirm={confirmLeave}
+      />
 
       <ConfirmDialog
         open={confirmUndo}

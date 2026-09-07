@@ -21,8 +21,12 @@ import ConfirmDialog from './ConfirmDialog.jsx'
 import ActionConfirmDialog, { actionAlert } from './ActionConfirmDialog.jsx'
 import AddJobOrderModal from './AddJobOrderModal.jsx'
 import JobOrderDetail from './JobOrderDetail.jsx'
+import EditableCell from './EditableCell.jsx'
+import EditBar from './EditBar.jsx'
+import LeaveEditDialog from './LeaveEditDialog.jsx'
 import useTableEdit from '../hooks/useTableEdit.js'
 import useAutoAlert from '../hooks/useAutoAlert.js'
+import { validateJobOrderRow } from '../lib/validate.js'
 import { formatDate, peso } from '../lib/format.js'
 import { listParties } from '../api/parties.js'
 import { listMaterials } from '../api/materials.js'
@@ -176,7 +180,20 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
     setSelected(new Set())
     setAlert({ variant: 'success', title: 'Changes saved.' })
     reload()
-  })
+  }, validateJobOrderRow)
+
+  // Leaving mid-edit throws the draft away, so ask first.
+  const [leaveTo, setLeaveTo] = useState(null)
+  function guard(action) {
+    if (edit.dirty) setLeaveTo(() => action)
+    else action()
+  }
+  function confirmLeave() {
+    const action = leaveTo
+    setLeaveTo(null)
+    edit.cancel()
+    action?.()
+  }
 
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id))
   function toggleAll() {
@@ -269,7 +286,7 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={onBack}
+          onClick={() => guard(onBack)}
           aria-label="Back"
           className="rounded-md p-1 text-content transition-colors hover:bg-white"
         >
@@ -319,28 +336,16 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <SegmentedTabs value={tab} options={TABS} disabled={edit.editing} onChange={reset(setTab)} />
+        <SegmentedTabs value={tab} options={TABS} onChange={(v) => guard(() => reset(setTab)(v))} />
 
         {tab === 'active' &&
           (edit.editing ? (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setConfirmUndo(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-danger px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-danger-hover"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Undo All
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmSave(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-info px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-info-hover"
-              >
-                <Save className="h-4 w-4" />
-                Save Changes
-              </button>
-            </div>
+            <EditBar
+              errorCount={edit.errorCount}
+              saving={edit.saving}
+              onUndo={() => setConfirmUndo(true)}
+              onSave={() => setConfirmSave(true)}
+            />
           ) : (
             <button
               type="button"
@@ -447,6 +452,7 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
                   )}
                   {JOB_ORDER_LIST_COLUMNS.map((c) => {
                     const editable = edit.editing && EDITABLE.includes(c.key)
+                    const error = editable ? edit.errorsFor(r.id)[c.key] : undefined
                     let content = cell(r[c.key], c.type)
                     if (editable && c.type === 'date') {
                       content = (
@@ -454,6 +460,7 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
                           size="sm"
                           wrapperClassName="min-w-44"
                           value={r[c.key] ?? ''}
+                          error={error}
                           onChange={(v) => edit.setCell(r.id, c.key, v)}
                         />
                       )
@@ -465,20 +472,26 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
                           min={0}
                           wrapperClassName="min-w-28"
                           value={r[c.key] ?? ''}
+                          error={error}
                           onChange={(v) => edit.setCell(r.id, c.key, v)}
                         />
                       )
                     } else if (editable) {
                       content = (
-                        <input
-                          value={r[c.key] ?? ''}
-                          onChange={(e) => edit.setCell(r.id, c.key, e.target.value)}
-                          className="w-full min-w-28 rounded border border-purple-light bg-white px-2 py-1 text-sm outline-none focus:border-purple focus:ring-1 focus:ring-purple-light"
+                        <EditableCell
+                          value={r[c.key]}
+                          error={error}
+                          onChange={(v) => edit.setCell(r.id, c.key, v)}
                         />
                       )
                     }
                     return (
-                      <td key={c.key} className="whitespace-nowrap px-3 py-2 text-content">
+                      <td
+                        key={c.key}
+                        className={`px-3 py-2 align-top text-content ${
+                          edit.editing ? '' : 'whitespace-nowrap'
+                        }`}
+                      >
                         {content}
                       </td>
                     )
@@ -549,6 +562,12 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
         onClose={() => setAddOpen(false)}
         onAdd={handleAdd}
         customerOptions={customerOptions}
+      />
+
+      <LeaveEditDialog
+        open={Boolean(leaveTo)}
+        onClose={() => setLeaveTo(null)}
+        onConfirm={confirmLeave}
       />
 
       <ActionConfirmDialog
