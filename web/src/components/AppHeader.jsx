@@ -16,6 +16,12 @@ export const NAV_ITEMS = [
   { label: 'My Profile', to: '/my-profile' },
 ]
 
+// Where a signed-in user lands: Corporate Profiles when they can open it,
+// otherwise the first nav item they can, otherwise My Profile.
+export function homePath(hasModule) {
+  return NAV_ITEMS.find((item) => hasModule(item.moduleKey))?.to || '/my-profile'
+}
+
 const linkClass = (active) =>
   `border-b-2 pb-1 text-base font-medium transition-colors ${
     active ? 'border-white' : 'border-transparent text-white/80 hover:text-white'

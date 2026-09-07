@@ -19,7 +19,7 @@ const gate = (moduleKey, element) => (
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<Navigate to="/corporate-profiles" replace />} />
       <Route path="/login" element={<LoginPage />} />
 
       <Route path="/corporate-profiles" element={gate('corporate_profiles', <CorporateProfilesPage />)} />

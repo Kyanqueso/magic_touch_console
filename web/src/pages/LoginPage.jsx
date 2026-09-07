@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { AlertCircle, Check, Lock } from 'lucide-react'
 import Header from '../components/Header.jsx'
-import { NAV_ITEMS } from '../components/AppHeader.jsx'
+import { homePath } from '../components/AppHeader.jsx'
 import Button from '../components/Button.jsx'
 import TextField from '../components/TextField.jsx'
 import ResetPasswordModal from '../components/ResetPasswordModal.jsx'
@@ -18,7 +18,6 @@ const STATUS = {
 }
 
 export default function LoginPage() {
-  const navigate = useNavigate()
   const location = useLocation()
   const { session, loading, hasModule } = useAuth()
   const [form, setForm] = useState({ email: '', password: '' })
@@ -32,10 +31,10 @@ export default function LoginPage() {
 
   const busy = status === STATUS.SUBMITTING || status === STATUS.SUCCESS
 
-  // First page this user can actually open; My Profile is the floor since it
-  // has no module gate. `loading` covers the profile fetch, so grants are known.
-  const firstAllowed = NAV_ITEMS.find((item) => hasModule(item.moduleKey))
-  const dest = location.state?.from || firstAllowed?.to || '/my-profile'
+  // Where to land after login: back to a deep link if there was one, otherwise
+  // Corporate Profiles (the app home). `loading` covers the profile fetch, so
+  // grants are known by the time this redirect fires.
+  const dest = location.state?.from || homePath(hasModule)
 
   // Already signed in, skip the form - unless the reset modal is open, where
   // verifying the code creates a session that would otherwise unmount it.
@@ -77,8 +76,9 @@ export default function LoginPage() {
       setFormError(error.message || 'Invalid email or password.')
       return
     }
+    // The redirect above fires once the session and grants have loaded, so the
+    // destination reflects the real access matrix rather than an empty one.
     setStatus(STATUS.SUCCESS)
-    setTimeout(() => navigate(dest, { replace: true }), 600)
   }
 
   return (

@@ -1,19 +1,14 @@
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
-import { NAV_ITEMS } from '../components/AppHeader.jsx'
+import { homePath } from '../components/AppHeader.jsx'
 import { useAuth } from '../lib/auth.jsx'
 
 function ErrorPage({ code, title, message }) {
   const navigate = useNavigate()
-  const { key } = useLocation()
   const { session, hasModule } = useAuth()
-  // 'default' means a fresh load / typed URL — treat as outside the app.
-  const fromApp = key !== 'default'
 
-  // Send them somewhere they can actually open. Hardcoding a destination sent
-  // anyone without that grant straight back here, looping on the 403 page.
-  const home = NAV_ITEMS.find((item) => hasModule(item.moduleKey))?.to || '/my-profile'
-  const dest = session && fromApp ? home : '/login'
+  // Signed in -> back to a page they can open; signed out -> back to login.
+  const dest = session ? homePath(hasModule) : '/login'
 
   return (
     <div className="flex min-h-full flex-col items-center justify-center bg-component-bg px-6 py-16 text-center">
