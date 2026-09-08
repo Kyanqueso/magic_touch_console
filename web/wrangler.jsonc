@@ -1,8 +1,20 @@
 {
+  // Production. Cloudflare Workers Builds deploys this from `main`.
   "name": "magic-touch-console",
   "compatibility_date": "2026-09-06",
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
+  },
+
+  // Demo. Cloudflare Workers Builds deploys this from `demo`.
+  "env": {
+    "demo": {
+      "name": "magic-touch-console-demo",
+      "assets": {
+        "directory": "./dist",
+        "not_found_handling": "single-page-application"
+      }
+    }
   }
 }
