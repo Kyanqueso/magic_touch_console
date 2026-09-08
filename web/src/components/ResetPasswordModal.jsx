@@ -120,7 +120,9 @@ export default function ResetPasswordModal({ open, onClose }) {
   // or they end up logged in with a password they never set.
   async function handleClose() {
     if (step === STEPS.PASSWORD) {
-      await supabase.auth.signOut()
+      // Never block closing on the network; clearing the session locally is
+      // what stops them staying signed in with a password they never set.
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
     }
     onClose()
   }

@@ -13,8 +13,36 @@ const AuthContext = createContext({
 })
 
 const IDLE_LIMIT_MS = 30 * 60 * 1000
+const SESSION_LOOKUP_TIMEOUT_MS = 8000
 const LAST_ACTIVE_KEY = 'mtc.lastActiveAt'
 const SIGN_OUT_REASON_KEY = 'mtc.signedOutReason'
+
+// Both keys live in sessionStorage, alongside the session itself. In
+// localStorage the activity timestamp outlived the tab, so the next sign-in
+// read a stale "last active" from hours ago and expired itself immediately.
+const store = {
+  get(key) {
+    try {
+      return sessionStorage.getItem(key)
+    } catch {
+      return null
+    }
+  },
+  set(key, value) {
+    try {
+      sessionStorage.setItem(key, value)
+    } catch {
+      /* private mode - degrade to not expiring rather than breaking */
+    }
+  },
+  remove(key) {
+    try {
+      sessionStorage.removeItem(key)
+    } catch {
+      /* ignore */
+    }
+  },
+}
 
 /**
  * Reads and clears the reason for the last automatic sign-out, so the login
@@ -23,44 +51,27 @@ const SIGN_OUT_REASON_KEY = 'mtc.signedOutReason'
  * message appears for a deliberate sign-out.
  */
 export function takeSignOutReason() {
-  try {
-    const reason = localStorage.getItem(SIGN_OUT_REASON_KEY)
-    if (reason) localStorage.removeItem(SIGN_OUT_REASON_KEY)
-    return reason
-  } catch {
-    return null
-  }
+  const reason = store.get(SIGN_OUT_REASON_KEY)
+  if (reason) store.remove(SIGN_OUT_REASON_KEY)
+  return reason
 }
 
-/**
- * Signs the user out after 30 minutes without interaction.
- *
- * The timestamp lives in localStorage rather than a ref so the clock keeps
- * running while the tab is closed - otherwise reopening the app would reset
- * it and the session would effectively never expire. It is also shared across
- * tabs, so activity in one keeps the others alive.
- */
+/** Signs the user out after 30 minutes without interaction. */
 function useIdleSignOut(active, onExpire) {
   useEffect(() => {
     if (!active) return undefined
 
-    const read = () => Number(localStorage.getItem(LAST_ACTIVE_KEY)) || Date.now()
-    const touch = () => {
-      try {
-        localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
-      } catch {
-        /* private mode - fall back to never expiring rather than breaking */
-      }
-    }
+    const read = () => Number(store.get(LAST_ACTIVE_KEY)) || Date.now()
+    const touch = () => store.set(LAST_ACTIVE_KEY, String(Date.now()))
     const expire = () => {
-      try {
-        localStorage.removeItem(LAST_ACTIVE_KEY)
-        localStorage.setItem(SIGN_OUT_REASON_KEY, 'inactivity')
-      } catch {
-        /* ignore */
-      }
+      store.remove(LAST_ACTIVE_KEY)
+      store.set(SIGN_OUT_REASON_KEY, 'inactivity')
+      // Drop the session locally first. The app must never sit waiting on a
+      // network round trip to finish signing out - an expired token makes the
+      // server call fail, and the UI used to hang on a spinner forever.
       onExpire()
-      supabase.auth.signOut()
+      // scope 'local' clears storage without calling the server at all.
+      supabase.auth.signOut({ scope: 'local' }).catch(() => {})
     }
 
     // The session restored from a previous visit may already be stale - this
@@ -88,10 +99,6 @@ function useIdleSignOut(active, onExpire) {
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [sessionLoading, setSessionLoading] = useState(true)
-  // True from the moment a session is judged stale until Supabase has
-  // actually cleared it. Counted as loading so the app never renders for a
-  // session that is on its way out.
-  const [expiring, setExpiring] = useState(false)
 
   // Role + grants, fetched rather than read from the token: admins edit them at runtime.
   const [profile, setProfile] = useState(null)
@@ -99,21 +106,40 @@ export function AuthProvider({ children }) {
   const [profileError, setProfileError] = useState(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session ?? null)
+    let settled = false
+    const done = (next) => {
+      if (settled) return
+      settled = true
+      setSession(next ?? null)
+      setSessionLoading(false)
+    }
+
+    supabase.auth.getSession().then(({ data }) => done(data.session), () => done(null))
+    // Nothing here may leave the app on a spinner. If the lookup hangs or the
+    // network is down, fall through to signed-out: the login page is a state
+    // the user can act on, an endless loader is not.
+    const bail = setTimeout(() => done(null), SESSION_LOOKUP_TIMEOUT_MS)
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      settled = true
+      setSession(next ?? null)
       setSessionLoading(false)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      setSession(next ?? null)
-      if (next) setExpiring(false)
-    })
-    return () => sub.subscription.unsubscribe()
+    return () => {
+      clearTimeout(bail)
+      sub.subscription.unsubscribe()
+    }
   }, [])
 
-  const handleExpire = useCallback(() => setExpiring(true), [])
+  // Expiry drops the session here and now. Waiting for Supabase to confirm the
+  // sign-out is what used to wedge the app on a loading screen.
+  const handleExpire = useCallback(() => {
+    setSession(null)
+    setSessionLoading(false)
+  }, [])
   useIdleSignOut(Boolean(session), handleExpire)
 
-  const userId = expiring ? undefined : session?.user?.id
+  const userId = session?.user?.id
 
   useEffect(() => {
     if (!userId) {
@@ -173,9 +199,9 @@ export function AuthProvider({ children }) {
       hasModule,
       canEdit,
       profileError,
-      loading: sessionLoading || profileLoading || profilePending || (expiring && Boolean(session)),
+      loading: sessionLoading || profileLoading || profilePending,
     }),
-    [session, profile, isAdmin, hasModule, canEdit, profileError, sessionLoading, profileLoading, profilePending, expiring],
+    [session, profile, isAdmin, hasModule, canEdit, profileError, sessionLoading, profileLoading, profilePending],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -248,7 +274,9 @@ function ProfileErrorScreen({ error }) {
           )}
           <button
             type="button"
-            onClick={() => supabase.auth.signOut()}
+            // Local scope: this screen shows when the server is unreachable,
+            // which is exactly when a server-side sign-out would hang too.
+            onClick={() => supabase.auth.signOut({ scope: 'local' }).catch(() => {})}
             className="rounded-lg border border-purple-light px-4 py-2 text-base font-bold text-purple"
           >
             Sign out

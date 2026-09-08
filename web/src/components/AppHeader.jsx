@@ -60,7 +60,13 @@ export default function AppHeader({ items, title }) {
   }
 
   async function doLogout() {
-    await supabase.auth.signOut()
+    // A deliberate logout revokes the token server-side, but a failure there
+    // must not strand the user on a spinning dialog - clear locally and go.
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+    }
     navigate('/login', { replace: true })
   }
 
