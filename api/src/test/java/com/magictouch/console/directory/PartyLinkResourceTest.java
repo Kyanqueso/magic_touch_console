@@ -112,4 +112,51 @@ class PartyLinkResourceTest extends AuthenticatedApiTest {
         given().when().get(customersBase + "/" + customerId + "/link")
                 .then().statusCode(200).body("linkedId", nullValue());
     }
+
+    private long createSupplier() {
+        return given().contentType("application/json")
+                .body("""
+                    { "scope": "LOCAL", "name": "Northbridge Print Supply", "branchCode": "00077", "termsDays": 30 }
+                    """)
+                .when().post(suppliersBase)
+                .then().statusCode(201).extract().jsonPath().getLong("id");
+    }
+
+    @Test
+    void createsAnIndependentlyScopedLinkedCustomer() {
+        long supplierId = createSupplier();
+
+        given().when().get(suppliersBase + "/" + supplierId + "/link")
+                .then().statusCode(200).body("linkedId", nullValue());
+
+        // mirrors link-supplier: the new customer's scope is its own explicit
+        // choice, never inherited from the supplier's LOCAL scope.
+        long customerId = given().contentType("application/json")
+                .body("{ \"scope\": \"GLOBAL\" }")
+                .when().post(suppliersBase + "/" + supplierId + "/link-customer")
+                .then().statusCode(201)
+                .body("name", is("Northbridge Print Supply"))
+                .body("branchCode", is("00077"))
+                .body("scope", is("GLOBAL"))
+                .body("corporateProfileId", nullValue())
+                .body("termsDays", is(0))
+                .extract().jsonPath().getLong("id");
+
+        given().when().get(suppliersBase + "/" + supplierId + "/link")
+                .then().statusCode(200).body("linkedId", is((int) customerId));
+        given().when().get(customersBase + "/" + customerId + "/link")
+                .then().statusCode(200).body("linkedId", is((int) supplierId));
+    }
+
+    @Test
+    void rejectsLinkingASupplierThatIsAlreadyLinked() {
+        long supplierId = createSupplier();
+        given().contentType("application/json").body("{ \"scope\": \"GLOBAL\" }")
+                .when().post(suppliersBase + "/" + supplierId + "/link-customer")
+                .then().statusCode(201);
+
+        given().contentType("application/json").body("{ \"scope\": \"GLOBAL\" }")
+                .when().post(suppliersBase + "/" + supplierId + "/link-customer")
+                .then().statusCode(409);
+    }
 }

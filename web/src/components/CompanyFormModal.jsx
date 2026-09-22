@@ -21,15 +21,16 @@ const EMPTY = {
   wtax1: '',
   wtax2: '',
   scope: 'Local',
-  alsoAddSupplier: false,
-  supplierScope: 'Global',
+  alsoAddLinked: false,
+  linkedScope: 'Global',
 }
 
 // `onSubmit(values)` should return a promise; the modal closes once it resolves.
 // `scopeLocked` hides the Local/Global picker and forces scope to 'Global'
 // (used by the top-level Customers/Suppliers pages).
-// `offerLinkedSupplier` shows the "Also add as Supplier" checkbox (only makes
-// sense for the profile-embedded Add Customer form).
+// `linkOption` shows an "Also add as <linkOption>" checkbox — pass 'Supplier'
+// on the profile-embedded Add Customer form, 'Customer' on the profile-embedded
+// Add Supplier form, or omit it to hide the checkbox entirely.
 // `initial` pre-fills the form from an existing row, for editing rather than adding.
 export default function CompanyFormModal({
   open,
@@ -38,14 +39,14 @@ export default function CompanyFormModal({
   title,
   submitLabel = 'Add',
   scopeLocked = false,
-  offerLinkedSupplier = false,
+  linkOption = null,
   initial = null,
   // Names the record in the "cancel adding the ..." prompt.
   entityLabel = 'company',
 }) {
   const startForm = () =>
     initial
-      ? { ...EMPTY, ...initial, alsoAddSupplier: false, supplierScope: 'Global' }
+      ? { ...EMPTY, ...initial, alsoAddLinked: false, linkedScope: 'Global' }
       : { ...EMPTY, scope: scopeLocked ? 'Global' : EMPTY.scope }
 
   const [form, setForm] = useState(startForm)
@@ -220,23 +221,23 @@ export default function CompanyFormModal({
           />
         )}
 
-        {offerLinkedSupplier && (
+        {linkOption && (
           <div className="space-y-3 rounded-lg border border-purple-light p-4">
             <label className="flex items-center gap-2 text-sm font-bold text-content">
               <input
                 type="checkbox"
-                checked={form.alsoAddSupplier}
-                onChange={(e) => set('alsoAddSupplier', e.target.checked)}
+                checked={form.alsoAddLinked}
+                onChange={(e) => set('alsoAddLinked', e.target.checked)}
                 disabled={loading}
               />
-              Also add as Supplier
+              Also add as {linkOption}
             </label>
-            {form.alsoAddSupplier && (
+            {form.alsoAddLinked && (
               <PillGroup
-                label="Supplier Scope"
+                label={`${linkOption} Scope`}
                 options={SCOPES}
-                value={form.supplierScope}
-                onChange={(v) => set('supplierScope', v)}
+                value={form.linkedScope}
+                onChange={(v) => set('linkedScope', v)}
               />
             )}
           </div>

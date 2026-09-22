@@ -3,7 +3,7 @@ package com.magictouch.console.directory.api;
 import com.magictouch.console.common.model.Scopes;
 import com.magictouch.console.common.page.PageQuery;
 import com.magictouch.console.common.page.PageResponse;
-import com.magictouch.console.directory.api.dto.LinkSupplierRequest;
+import com.magictouch.console.directory.api.dto.LinkPartyRequest;
 import com.magictouch.console.directory.api.dto.LinkedPartyResponse;
 import com.magictouch.console.directory.api.dto.PartyRequest;
 import com.magictouch.console.directory.api.dto.PartyResponse;
@@ -110,7 +110,7 @@ public class CustomerResource {
     @Path("{id}/link-supplier")
     @Consumes(MediaType.APPLICATION_JSON)
     public Response linkSupplier(@PathParam("profileId") long profileId, @PathParam("id") long id,
-                                 @Valid LinkSupplierRequest body, @Context UriInfo uriInfo) {
+                                 @Valid LinkPartyRequest body, @Context UriInfo uriInfo) {
         PartyResponse created = links.createLinkedSupplier(profileId, id, body.scope());
         return Response
                 .created(uriInfo.getBaseUriBuilder()

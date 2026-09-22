@@ -38,6 +38,7 @@ import {
   restoreParty,
   deleteParty,
   linkNewSupplier,
+  linkNewCustomer,
   getPartyLink,
   syncLinkedParty,
 } from '../api/parties.js'
@@ -237,16 +238,18 @@ export default function EntityListPage({
     }
     setTab('active')
     setPage(1)
-    if (values.alsoAddSupplier && kind === 'customer' && profileId) {
+    if (values.alsoAddLinked && profileId) {
+      const linkedKind = kind === 'customer' ? 'supplier' : 'customer'
+      const linkFn = kind === 'customer' ? linkNewSupplier : linkNewCustomer
       try {
-        await linkNewSupplier(ctx, created.id, values.supplierScope)
-        setAlert({ variant: 'success', title: `${values.name} added, with a linked supplier.` })
+        await linkFn(ctx, created.id, values.linkedScope)
+        setAlert({ variant: 'success', title: `${values.name} added, with a linked ${linkedKind}.` })
       } catch (e) {
-        // The customer is already created; a failed link here shouldn't look
+        // The record is already created; a failed link here shouldn't look
         // like the whole add failed.
         setAlert({
           variant: 'danger',
-          title: `${values.name} added, but the linked supplier could not be created`,
+          title: `${values.name} added, but the linked ${linkedKind} could not be created`,
           message: errMessage(e),
         })
         reload()
@@ -569,7 +572,7 @@ export default function EntityListPage({
         title={`Add ${formTitle}`}
         submitLabel="Add"
         scopeLocked={!profileId}
-        offerLinkedSupplier={kind === 'customer' && Boolean(profileId)}
+        linkOption={profileId ? (kind === 'customer' ? 'Supplier' : 'Customer') : null}
         entityLabel={detailNoun}
       />
 

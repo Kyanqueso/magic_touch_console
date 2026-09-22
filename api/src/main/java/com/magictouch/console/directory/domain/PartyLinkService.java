@@ -82,6 +82,33 @@ public class PartyLinkService {
         return PartyResponse.from(s);
     }
 
+    /**
+     * Mirror of {@link #createLinkedSupplier} — creates a customer from the
+     * supplier's own identity fields, with the same independent-scope and
+     * defaults-only-commercial-terms rules.
+     */
+    @Transactional
+    public PartyResponse createLinkedCustomer(long profileId, long supplierId, Scope customerScope) {
+        Supplier s = requireSupplier(profileId, supplierId);
+        links.findBySupplierId(supplierId).ifPresent(l -> {
+            throw ApiException.conflict("This supplier is already linked to a customer.");
+        });
+
+        Customer c = new Customer();
+        c.scope = customerScope;
+        c.corporateProfileId = customerScope == Scope.LOCAL ? profileId : null;
+        copyIdentity(s, c);
+        customers.persist(c);
+
+        PartyLink link = new PartyLink();
+        link.customerId = c.id;
+        link.supplierId = supplierId;
+        link.createdBy = CurrentUser.id().orElse(null);
+        links.persist(link);
+
+        return PartyResponse.from(c);
+    }
+
     @Transactional
     public void syncIdentityToSupplier(long profileId, long customerId, PartyRequest body) {
         requireCustomer(profileId, customerId);

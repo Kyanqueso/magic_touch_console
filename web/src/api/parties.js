@@ -130,8 +130,8 @@ export const archiveParty = (ctx, id) => api.post(`${base(ctx)}/${id}/archive`)
 export const restoreParty = (ctx, id) => api.post(`${base(ctx)}/${id}/restore`)
 export const deleteParty = (ctx, id) => api.del(`${base(ctx)}/${id}`)
 
-// --- linked party (customer <-> supplier created together via "Also add as Supplier") ---
-// Only meaningful inside a corporate profile.
+// --- linked party (customer <-> supplier created together via "Also add as
+// Supplier"/"Also add as Customer") --- Only meaningful inside a corporate profile.
 
 export const getPartyLink = (ctx, id) =>
   api.get(`${base(ctx)}/${id}/link`).then((r) => (r.linkedId != null ? String(r.linkedId) : null))
@@ -140,6 +140,14 @@ export async function linkNewSupplier(ctx, id, supplierScope) {
   return toRow(
     await api.post(`${base(ctx)}/${id}/link-supplier`, {
       scope: supplierScope === 'Local' ? 'LOCAL' : 'GLOBAL',
+    }),
+  )
+}
+
+export async function linkNewCustomer(ctx, id, customerScope) {
+  return toRow(
+    await api.post(`${base(ctx)}/${id}/link-customer`, {
+      scope: customerScope === 'Local' ? 'LOCAL' : 'GLOBAL',
     }),
   )
 }
