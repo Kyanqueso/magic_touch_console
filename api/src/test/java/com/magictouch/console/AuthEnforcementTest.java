@@ -50,12 +50,14 @@ class AuthEnforcementTest {
                 "/api/v1/profiles",
                 "/api/v1/accounts",
                 "/api/v1/account-categories",
-                "/api/v1/materials",
-                "/api/v1/material-groups",
                 "/api/v1/customers",
                 "/api/v1/suppliers",
                 "/api/v1/profiles/1/customers",
                 "/api/v1/profiles/1/suppliers",
+                "/api/v1/profiles/1/accounts",
+                "/api/v1/profiles/1/account-categories",
+                "/api/v1/profiles/1/materials",
+                "/api/v1/profiles/1/material-groups",
                 "/api/v1/profiles/1/job-orders",
                 "/api/v1/profiles/1/suppliers/1/purchase-orders",
                 "/api/v1/profiles/1/suppliers/1/sales-invoices",
@@ -102,7 +104,8 @@ class AuthEnforcementTest {
         given().header("Authorization", TestTokens.bearer(testUsers.ensureAdmin()))
                 .when().get("/api/v1/modules")
                 .then().statusCode(200)
-                .body("size()", is(6));
+                // V002 seed minus `materials` (removed in V010: Inventory rides on job_orders).
+                .body("size()", is(5));
     }
 
     // --- CORS preflight -------------------------------------------------

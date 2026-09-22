@@ -36,7 +36,8 @@ class AuthorizationTest {
     void userWithNoGrantsIsForbidden() {
         UUID u = testUsers.withNoAccess();
         as(u).when().get("/api/v1/customers").then().statusCode(403);
-        as(u).when().get("/api/v1/materials").then().statusCode(403);
+        // Inventory (materials) has no module key of its own - it rides on job_orders.
+        as(u).when().get("/api/v1/profiles/1/materials").then().statusCode(403);
         as(u).when().get("/api/v1/profiles").then().statusCode(403);
     }
 
@@ -72,7 +73,7 @@ class AuthorizationTest {
     void aGrantOnOneModuleDoesNotOpenAnother() {
         UUID u = testUsers.withAccess("customers", AccessLevel.EDITOR);
         as(u).when().get("/api/v1/customers").then().statusCode(200);
-        as(u).when().get("/api/v1/materials").then().statusCode(403);
+        as(u).when().get("/api/v1/profiles/1/materials").then().statusCode(403);
         as(u).when().get("/api/v1/accounts").then().statusCode(403);
         as(u).when().get("/api/v1/profiles").then().statusCode(403);
     }
@@ -92,14 +93,27 @@ class AuthorizationTest {
         as(u).when().get("/api/v1/profiles/1/job-orders").then().statusCode(403);
     }
 
-    /** The job-order picker endpoints ride on the job_orders grant, not customers/materials. */
+    /** The job-order picker endpoints (including Inventory) ride on the job_orders grant alone. */
     @Test
     void jobOrdersGrantCoversItsLookups() {
         UUID u = testUsers.withAccess("job_orders", AccessLevel.VIEWER);
         as(u).when().get("/api/v1/profiles/1/job-orders/lookups").then().statusCode(not(403));
-        // ...but a materials grant alone does not open the job-order path
-        UUID m = testUsers.withAccess("materials", AccessLevel.EDITOR);
-        as(m).when().get("/api/v1/profiles/1/job-orders/lookups").then().statusCode(403);
+        // ...but a grant on an unrelated module does not open the job-order path.
+        // Inventory (materials) has no module key of its own to test here at all -
+        // it was removed entirely and rides on job_orders (see ModuleRoutes).
+        UUID c = testUsers.withAccess("customers", AccessLevel.EDITOR);
+        as(c).when().get("/api/v1/profiles/1/job-orders/lookups").then().statusCode(403);
+    }
+
+    /** Inventory (materials) has no module of its own; it rides entirely on job_orders. */
+    @Test
+    void inventoryFollowsTheJobOrdersGrant() {
+        UUID u = testUsers.withAccess("job_orders", AccessLevel.VIEWER);
+        as(u).when().get("/api/v1/profiles/1/materials").then().statusCode(not(403));
+        as(u).when().get("/api/v1/profiles/1/material-groups").then().statusCode(not(403));
+
+        UUID other = testUsers.withAccess("customers", AccessLevel.EDITOR);
+        as(other).when().get("/api/v1/profiles/1/materials").then().statusCode(403);
     }
 
     /** A nested path is governed by the nested module, not by Corporate Profiles. */
@@ -118,7 +132,7 @@ class AuthorizationTest {
     void adminBypassesTheMatrix() {
         UUID admin = testUsers.ensureAdmin();
         as(admin).when().get("/api/v1/customers").then().statusCode(200);
-        as(admin).when().get("/api/v1/materials").then().statusCode(200);
+        as(admin).when().get("/api/v1/profiles/1/materials").then().statusCode(not(403));
         as(admin).when().get("/api/v1/users").then().statusCode(200);
     }
 

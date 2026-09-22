@@ -21,14 +21,19 @@ public final class ModuleRoutes {
             new Route("^profiles/\\d+/suppliers(/.*)?$", "suppliers"),
             new Route("^profiles/\\d+/customers(/.*)?$", "customers"),
             new Route("^profiles/\\d+/job-orders(/.*)?$", "job_orders"),
+            // Inventory (materials) has no module grant of its own - it rides
+            // entirely on job_orders, matching the existing /job-orders/lookups
+            // endpoint that already exposes materials to any job_orders user.
+            new Route("^profiles/\\d+/materials(/.*)?$", "job_orders"),
+            new Route("^profiles/\\d+/material-groups(/.*)?$", "job_orders"),
+            new Route("^profiles/\\d+/accounts(/.*)?$", "chart_of_accounts"),
+            new Route("^profiles/\\d+/account-categories(/.*)?$", "chart_of_accounts"),
             new Route("^profiles/\\d+/modules$", "corporate_profiles"),
             new Route("^profiles(/.*)?$", "corporate_profiles"),
             new Route("^customers(/.*)?$", "customers"),
             new Route("^suppliers(/.*)?$", "suppliers"),
             new Route("^accounts(/.*)?$", "chart_of_accounts"),
-            new Route("^account-categories(/.*)?$", "chart_of_accounts"),
-            new Route("^materials(/.*)?$", "materials"),
-            new Route("^material-groups(/.*)?$", "materials")
+            new Route("^account-categories(/.*)?$", "chart_of_accounts")
     );
 
     private ModuleRoutes() {

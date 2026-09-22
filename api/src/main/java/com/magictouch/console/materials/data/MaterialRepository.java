@@ -12,9 +12,12 @@ import java.util.Map;
 @ApplicationScoped
 public class MaterialRepository implements PanacheRepository<Material> {
 
-    public PanacheQuery<Material> search(boolean archived, String term, Long groupId, Sort sort) {
-        StringBuilder q = new StringBuilder(archived ? "archivedAt is not null" : "archivedAt is null");
+    /** Inventory is per-profile: every query is scoped to one corporate profile. */
+    public PanacheQuery<Material> search(long profileId, boolean archived, String term, Long groupId, Sort sort) {
+        StringBuilder q = new StringBuilder("corporateProfileId = :profileId and ")
+                .append(archived ? "archivedAt is not null" : "archivedAt is null");
         Map<String, Object> params = new HashMap<>();
+        params.put("profileId", profileId);
         if (groupId != null) {
             q.append(" and materialGroup.id = :grp");
             params.put("grp", groupId);
@@ -26,7 +29,7 @@ public class MaterialRepository implements PanacheRepository<Material> {
         return find(q.toString(), sort, params);
     }
 
-    public Material findByCode(String code) {
-        return find("code", code).firstResult();
+    public Material findByCode(long profileId, String code) {
+        return find("corporateProfileId = ?1 and code = ?2", profileId, code).firstResult();
     }
 }

@@ -3,9 +3,12 @@ package com.magictouch.console.directory.api;
 import com.magictouch.console.common.model.Scopes;
 import com.magictouch.console.common.page.PageQuery;
 import com.magictouch.console.common.page.PageResponse;
+import com.magictouch.console.directory.api.dto.LinkSupplierRequest;
+import com.magictouch.console.directory.api.dto.LinkedPartyResponse;
 import com.magictouch.console.directory.api.dto.PartyRequest;
 import com.magictouch.console.directory.api.dto.PartyResponse;
 import com.magictouch.console.directory.domain.CustomerService;
+import com.magictouch.console.directory.domain.PartyLinkService;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
@@ -29,9 +32,11 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 public class CustomerResource {
 
     private final CustomerService service;
+    private final PartyLinkService links;
 
-    public CustomerResource(CustomerService service) {
+    public CustomerResource(CustomerService service, PartyLinkService links) {
         this.service = service;
+        this.links = links;
     }
 
     @GET
@@ -90,6 +95,37 @@ public class CustomerResource {
     @Path("{id}")
     public Response delete(@PathParam("profileId") long profileId, @PathParam("id") long id) {
         service.delete(profileId, id);
+        return Response.noContent().build();
+    }
+
+    // --- linked supplier (customer <-> supplier created together via "Also add as Supplier") ---
+
+    @GET
+    @Path("{id}/link")
+    public LinkedPartyResponse link(@PathParam("profileId") long profileId, @PathParam("id") long id) {
+        return new LinkedPartyResponse(links.linkedSupplierId(profileId, id));
+    }
+
+    @POST
+    @Path("{id}/link-supplier")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response linkSupplier(@PathParam("profileId") long profileId, @PathParam("id") long id,
+                                 @Valid LinkSupplierRequest body, @Context UriInfo uriInfo) {
+        PartyResponse created = links.createLinkedSupplier(profileId, id, body.scope());
+        return Response
+                .created(uriInfo.getBaseUriBuilder()
+                        .path("api/v1/profiles/{profileId}/suppliers/{id}")
+                        .build(profileId, created.id()))
+                .entity(created)
+                .build();
+    }
+
+    @POST
+    @Path("{id}/sync-linked")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response syncLinked(@PathParam("profileId") long profileId, @PathParam("id") long id,
+                               @Valid PartyRequest body) {
+        links.syncIdentityToSupplier(profileId, id, body);
         return Response.noContent().build();
     }
 }

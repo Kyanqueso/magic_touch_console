@@ -35,7 +35,7 @@ class JobOrderResourceTest extends AuthenticatedApiTest {
         base = "/api/v1/profiles/" + profileId + "/job-orders";
 
         customerId = given().contentType("application/json")
-                .body("{ \"scope\": \"GLOBAL\", \"name\": \"Sunrise Trading Co.\" }")
+                .body("{ \"scope\": \"GLOBAL\", \"name\": \"Sunrise Trading Co.\", \"branchCode\": \"00000\" }")
                 .when().post("/api/v1/profiles/" + profileId + "/customers")
                 .then().statusCode(201).extract().jsonPath().getLong("id");
 
@@ -43,7 +43,7 @@ class JobOrderResourceTest extends AuthenticatedApiTest {
         materialId = given().contentType("application/json")
                 .body("{ \"group\": \"Newsprint\", \"code\": \"%s\", \"name\": \"Newsprint White\", \"unitPrice\": 0.25 }"
                         .formatted(materialCode))
-                .when().post("/api/v1/materials")
+                .when().post("/api/v1/profiles/" + profileId + "/materials")
                 .then().statusCode(201).extract().jsonPath().getLong("id");
     }
 
@@ -58,7 +58,6 @@ class JobOrderResourceTest extends AuthenticatedApiTest {
                     {
                       "customerId": %d,
                       "jobDescription": "Sales Invoice Printing",
-                      "branch": "Main Branch",
                       "dateOrdered": "2026-09-01",
                       "deliveryDate": "2026-09-10",
                       "qty": 5000,
@@ -71,6 +70,8 @@ class JobOrderResourceTest extends AuthenticatedApiTest {
                 .body("id", greaterThanOrEqualTo(1001))
                 .body("status", is("OPEN"))
                 .body("customerName", is("Sunrise Trading Co."))
+                // branch is never client input - it's a snapshot of the resolved customer's own branch code.
+                .body("branch", is("00000"))
                 .body("materials", hasSize(0))
                 .extract().header("Location");
 
@@ -88,7 +89,6 @@ class JobOrderResourceTest extends AuthenticatedApiTest {
                 .body("""
                     {
                       "customerId": %d,
-                      "branch": "Mandurriao",
                       "seriesFrom": "10001",
                       "seriesTo": "10500",
                       "equipment": "riso",
@@ -109,7 +109,7 @@ class JobOrderResourceTest extends AuthenticatedApiTest {
                 .when().post(base).then().statusCode(201).extract().header("Location");
 
         given().when().get(loc).then().statusCode(200)
-                .body("branch", is("Mandurriao"))
+                .body("branch", is("00000"))
                 .body("seriesFrom", is("10001"))
                 .body("seriesTo", is("10500"))
                 .body("equipment", is("riso"))
@@ -129,10 +129,10 @@ class JobOrderResourceTest extends AuthenticatedApiTest {
         // An update carrying the same fields must not blank them out either.
         given().contentType("application/json")
                 .body("""
-                    { "customerId": %d, "branch": "Jaro", "atpNo": "ATP-99", "orNo": "OR-55" }
+                    { "customerId": %d, "atpNo": "ATP-99", "orNo": "OR-55" }
                     """.formatted(customerId))
                 .when().put(loc).then().statusCode(200)
-                .body("branch", is("Jaro"))
+                .body("branch", is("00000"))
                 .body("atpNo", is("ATP-99"))
                 .body("orNo", is("OR-55"));
     }
@@ -246,11 +246,26 @@ class JobOrderResourceTest extends AuthenticatedApiTest {
     }
 
     @Test
-    void lookupsReturnCustomersAndMaterials() {
+    void lookupsGroupCustomersIntoCompaniesAndReturnMaterials() {
         given().when().get(base + "/lookups")
                 .then().statusCode(200)
-                .body("customers.name", hasItem("Sunrise Trading Co."))
+                .body("companies.name", hasItem("Sunrise Trading Co."))
+                .body("companies.find { it.name == 'Sunrise Trading Co.' }.branches.branchCode", hasItem("00000"))
                 .body("materials.code", hasItem(materialCode));
+    }
+
+    @Test
+    void noOfSetsDrivesQtyAndSeriesTo() {
+        String loc = given().contentType("application/json")
+                .body("""
+                    { "customerId": %d, "seriesFrom": "1", "noOfSets": 2 }
+                    """.formatted(customerId))
+                .when().post(base).then().statusCode(201).extract().header("Location");
+
+        given().when().get(loc).then().statusCode(200)
+                .body("noOfSets", is(2))
+                .body("qty", is(100))
+                .body("seriesTo", is("101"));
     }
 
     @Test

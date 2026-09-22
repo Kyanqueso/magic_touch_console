@@ -8,6 +8,7 @@ import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
@@ -17,7 +18,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.List;
 
-@Path("/api/v1/material-groups")
+@Path("/api/v1/profiles/{profileId}/material-groups")
 @Produces(MediaType.APPLICATION_JSON)
 @Tag(name = "Materials")
 public class MaterialGroupResource {
@@ -29,14 +30,15 @@ public class MaterialGroupResource {
     }
 
     @GET
-    public List<MaterialGroupResponse> list() {
-        return service.listGroups();
+    public List<MaterialGroupResponse> list(@PathParam("profileId") long profileId) {
+        return service.listGroups(profileId);
     }
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response create(@Valid MaterialGroupRequest body, @Context UriInfo uriInfo) {
-        MaterialGroupResponse created = service.createGroup(body);
+    public Response create(@PathParam("profileId") long profileId, @Valid MaterialGroupRequest body,
+                           @Context UriInfo uriInfo) {
+        MaterialGroupResponse created = service.createGroup(profileId, body);
         return Response
                 .created(uriInfo.getAbsolutePathBuilder().path(String.valueOf(created.id())).build())
                 .entity(created)

@@ -4,7 +4,6 @@ import CorporateProfilesPage from './pages/CorporateProfilesPage.jsx'
 import ChartOfAccountsPage from './pages/ChartOfAccountsPage.jsx'
 import CustomersPage from './pages/CustomersPage.jsx'
 import SuppliersPage from './pages/SuppliersPage.jsx'
-import MaterialsPage from './pages/MaterialsPage.jsx'
 import MyProfilePage from './pages/MyProfilePage.jsx'
 import { ForbiddenPage, NotFoundPage } from './pages/ErrorPage.jsx'
 import { RequireAuth, RequireModule } from './lib/auth.jsx'
@@ -26,7 +25,6 @@ export default function App() {
       <Route path="/chart-of-accounts" element={gate('chart_of_accounts', <ChartOfAccountsPage />)} />
       <Route path="/customers" element={gate('customers', <CustomersPage />)} />
       <Route path="/suppliers" element={gate('suppliers', <SuppliersPage />)} />
-      <Route path="/materials" element={gate('materials', <MaterialsPage />)} />
       <Route path="/my-profile" element={protect(<MyProfilePage />)} />
 
       <Route path="/403" element={<ForbiddenPage />} />

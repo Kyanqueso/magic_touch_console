@@ -1,7 +1,9 @@
 import { api, qs } from './http.js'
 
 // Chart of Accounts. Categories are a flat lookup; accounts hang off a category
-// by free-text name (server creates the category if it's new).
+// by free-text name (server creates the category if it's new). Both are scoped
+// LOCAL/GLOBAL like customers/suppliers: top-level pages hit the global path,
+// a corporate profile's own Chart of Accounts hits the scoped path.
 
 const CLASS_TO_UI = {
   ASSET: 'Asset',
@@ -17,6 +19,8 @@ const UI_TO_CLASS = {
   Revenue: 'REVENUE',
   Expense: 'EXPENSE',
 }
+
+const SCOPE_TO_UI = { GLOBAL: 'Global', LOCAL: 'Local' }
 
 // Fallback when the form didn't capture an explicit class.
 const SUBTYPE_TO_CLASS = {
@@ -34,9 +38,20 @@ const SUBTYPE_TO_CLASS = {
 
 const SORT_MAP = { 'code-asc': 'code', 'code-desc': '-code', az: 'name', za: '-name' }
 
+const PATH = {
+  accounts: { global: '/api/v1/accounts', scoped: (pid) => `/api/v1/profiles/${pid}/accounts` },
+  categories: {
+    global: '/api/v1/account-categories',
+    scoped: (pid) => `/api/v1/profiles/${pid}/account-categories`,
+  },
+}
+
+const base = (which, profileId) => (profileId ? PATH[which].scoped(profileId) : PATH[which].global)
+
 function toRow(a) {
   return {
     id: String(a.id),
+    scope: SCOPE_TO_UI[a.scope] || 'Global',
     categoryId: String(a.categoryId),
     categoryName: a.categoryName || '',
     code: a.code || '',
@@ -50,9 +65,11 @@ function toRow(a) {
   }
 }
 
-// Accepts an AddAccountModal payload (`category`, `title`, `type`) or a toRow() row.
-function fromForm(v) {
+// Accepts an AddAccountModal payload (`category`, `title`, `type`, `scope`) or a toRow() row.
+function fromForm(v, { profileId } = {}) {
+  const wantsLocal = Boolean(profileId) && v.scope === 'Local'
   return {
+    scope: wantsLocal ? 'LOCAL' : 'GLOBAL',
     category: (v.category ?? v.categoryName ?? '').trim(),
     accountClass:
       UI_TO_CLASS[v.type] || SUBTYPE_TO_CLASS[v.subType] || 'ASSET',
@@ -65,26 +82,31 @@ function fromForm(v) {
   }
 }
 
-export async function listCategories() {
-  const rows = await api.get('/api/v1/account-categories')
-  return rows.map((c) => ({ id: String(c.id), name: c.name }))
+// ctx = { profileId: string | null }
+
+export async function listCategories(ctx = {}) {
+  const rows = await api.get(base('categories', ctx.profileId))
+  return rows.map((c) => ({ id: String(c.id), name: c.name, scope: SCOPE_TO_UI[c.scope] || 'Global' }))
 }
 
-export async function listAccounts({ tab = 'active', q = '', sort = '' } = {}) {
-  const res = await api.get(
-    `/api/v1/accounts${qs({ tab, q, sort: SORT_MAP[sort] || '', page: 1, size: 500 })}`,
-  )
+export async function listAccounts(
+  ctx = {},
+  { tab = 'active', q = '', sort = '', scope = 'All' } = {},
+) {
+  const params = { tab, q, sort: SORT_MAP[sort] || '', page: 1, size: 500 }
+  if (ctx.profileId && scope && scope !== 'All') params.scope = scope
+  const res = await api.get(base('accounts', ctx.profileId) + qs(params))
   return res.items.map(toRow)
 }
 
-export async function createAccount(values) {
-  return toRow(await api.post('/api/v1/accounts', fromForm(values)))
+export async function createAccount(ctx, values) {
+  return toRow(await api.post(base('accounts', ctx.profileId), fromForm(values, ctx)))
 }
 
-export async function updateAccount(id, values) {
-  return toRow(await api.put(`/api/v1/accounts/${id}`, fromForm(values)))
+export async function updateAccount(ctx, id, values) {
+  return toRow(await api.put(`${base('accounts', ctx.profileId)}/${id}`, fromForm(values, ctx)))
 }
 
-export const archiveAccount = (id) => api.post(`/api/v1/accounts/${id}/archive`)
-export const restoreAccount = (id) => api.post(`/api/v1/accounts/${id}/restore`)
-export const deleteAccount = (id) => api.del(`/api/v1/accounts/${id}`)
+export const archiveAccount = (ctx, id) => api.post(`${base('accounts', ctx.profileId)}/${id}/archive`)
+export const restoreAccount = (ctx, id) => api.post(`${base('accounts', ctx.profileId)}/${id}/restore`)
+export const deleteAccount = (ctx, id) => api.del(`${base('accounts', ctx.profileId)}/${id}`)

@@ -1,5 +1,6 @@
 package com.magictouch.console.purchasing.domain;
 
+import com.magictouch.console.coa.data.Account;
 import com.magictouch.console.coa.data.AccountRepository;
 import com.magictouch.console.common.error.ApiException;
 import com.magictouch.console.common.model.Scope;
@@ -36,8 +37,15 @@ public class PurchasingLookups {
         return s;
     }
 
-    public void checkAccount(String field, Long id) {
-        if (id != null && accounts.findById(id) == null) {
+    // An account usable on this profile's documents: its own Local one, or any Global one.
+    public void checkAccount(long profileId, String field, Long id) {
+        if (id == null) {
+            return;
+        }
+        Account a = accounts.findById(id);
+        boolean usable = a != null
+                && (a.scope == Scope.GLOBAL || Objects.equals(a.corporateProfileId, profileId));
+        if (!usable) {
             throw ApiException.invalidField(field, "No such account.");
         }
     }

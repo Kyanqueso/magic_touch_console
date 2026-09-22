@@ -87,7 +87,9 @@ function toJob(j) {
     customerId: j.customerId != null ? String(j.customerId) : '',
     customerName: j.customerName || '',
     status: STATUS_TO_UI[j.status] || 'Open',
+    // Never client input - a snapshot of the resolved customer's own branch code.
     branch: j.branch || '',
+    noOfSets: j.noOfSets ?? '',
     seriesFrom: j.seriesFrom || '',
     seriesTo: j.seriesTo || '',
     jobDescription: j.jobDescription || '',
@@ -117,7 +119,7 @@ function toJob(j) {
 function fromJob(v) {
   return {
     customerId: v.customerId ? Number(v.customerId) : null,
-    branch: v.branch || null,
+    noOfSets: v.noOfSets === '' || v.noOfSets == null ? null : Number(v.noOfSets),
     seriesFrom: v.seriesFrom || null,
     seriesTo: v.seriesTo || null,
     jobDescription: v.jobDescription || null,
@@ -173,12 +175,19 @@ export const getJobOrder = (pid, id) => api.get(`${jobBase(pid)}/${id}`).then(to
 export const getJobOrderSummary = (pid, customerId) =>
   api.get(`${jobBase(pid)}/summary${qs({ customerId })}`).then((rows) => rows.map(toJob))
 
-// Customer + material picker data. Gated by job_orders, so it works even if the
-// user has no customers / materials grant of their own.
+// Company/branch + material picker data. Gated by job_orders, so it works even
+// if the user has no customers / materials grant of their own. Each company
+// groups the customer records (its branches) sharing one name.
 export async function getJobOrderLookups(pid) {
   const d = await api.get(`${jobBase(pid)}/lookups`)
   return {
-    customers: (d.customers || []).map((c) => ({ value: String(c.id), label: c.name })),
+    companies: (d.companies || []).map((c) => ({
+      name: c.name,
+      branches: (c.branches || []).map((b) => ({
+        customerId: String(b.customerId),
+        branchCode: b.branchCode || '',
+      })),
+    })),
     materials: (d.materials || []).map((m) => ({
       value: String(m.id),
       label: `${m.code} — ${m.name}`,

@@ -5,7 +5,9 @@ import Select from './Select.jsx'
 import DateField from './DateField.jsx'
 import EntityListPage from './EntityListPage.jsx'
 import JobOrdersSection from './JobOrdersSection.jsx'
+import InventorySection from './InventorySection.jsx'
 import SupplierDetail from './SupplierDetail.jsx'
+import ChartOfAccountsPage from '../pages/ChartOfAccountsPage.jsx'
 import { COMPANY_TYPES, TAX_TYPES, WTAX_ATC, splitAtc } from '../lib/options.js'
 import { useNavigationGuard } from '../lib/unsavedChanges.jsx'
 import { formatDate } from '../lib/format.js'
@@ -147,6 +149,45 @@ export default function CorporateProfileDetail({
           profileName={profile.name}
           onBack={onExitSection}
         />
+      </div>
+    )
+  }
+
+  if (section === 'inventory') {
+    return (
+      <div className="mx-auto max-w-6xl">
+        <InventorySection
+          profileId={profile.id}
+          profileName={profile.name}
+          onBack={onExitSection}
+        />
+      </div>
+    )
+  }
+
+  if (section === 'accounts') {
+    return (
+      <div className="mx-auto max-w-6xl">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => guard(onExitSection)}
+            aria-label="Back"
+            className="rounded-md p-1 text-content transition-colors hover:bg-white"
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </button>
+          <h1 className="text-2xl font-extrabold text-content">
+            {profile.name} Chart of Accounts
+          </h1>
+        </div>
+        <div className="mt-6">
+          <ChartOfAccountsPage
+            embedded
+            profileId={profile.id}
+            scopeOptions={['All', 'Global', 'Local']}
+          />
+        </div>
       </div>
     )
   }

@@ -64,7 +64,7 @@ public class VoucherService {
         Voucher v = new Voucher();
         v.corporateProfileId = profileId;
         v.salesInvoice = requireInvoice(profileId, supplierId, body.salesInvoiceId());
-        apply(v, body);
+        apply(profileId, v, body);
         repo.persist(v);
         return VoucherResponse.from(v);
     }
@@ -74,7 +74,7 @@ public class VoucherService {
         Voucher v = require(profileId, supplierId, id);
         requireActive(v);
         v.salesInvoice = requireInvoice(profileId, supplierId, body.salesInvoiceId());
-        apply(v, body);
+        apply(profileId, v, body);
         return VoucherResponse.from(v);
     }
 
@@ -138,10 +138,10 @@ public class VoucherService {
         return s;
     }
 
-    private void apply(Voucher v, VoucherRequest b) {
-        lookups.checkAccount("debitAccountId", b.debitAccountId());
-        lookups.checkAccount("creditCashAccountId", b.creditCashAccountId());
-        lookups.checkAccount("creditPayableAccountId", b.creditPayableAccountId());
+    private void apply(long profileId, Voucher v, VoucherRequest b) {
+        lookups.checkAccount(profileId, "debitAccountId", b.debitAccountId());
+        lookups.checkAccount(profileId, "creditCashAccountId", b.creditCashAccountId());
+        lookups.checkAccount(profileId, "creditPayableAccountId", b.creditPayableAccountId());
         v.voucherDate = b.voucherDate();
         v.netAmount = b.netAmount();
         v.paid = b.paid();

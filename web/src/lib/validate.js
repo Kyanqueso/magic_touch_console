@@ -79,7 +79,9 @@ export function validateJobOrderDetail(draft) {
     specification: tooLong(draft.specification, 160),
     seriesFrom: tooLong(draft.seriesFrom, 20),
     seriesTo: seriesError(draft.seriesFrom, draft.seriesTo) || tooLong(draft.seriesTo, 20),
-    branch: tooLong(draft.branch, 80),
+    noOfSets: optional(draft.noOfSets, () =>
+      numberInRange(draft.noOfSets, { min: 0, label: 'No. of sets' }),
+    ),
     po: tooLong(draft.po, 40),
     atp: tooLong(draft.atp, 40),
     invoiceNo: tooLong(draft.invoiceNo, 40),

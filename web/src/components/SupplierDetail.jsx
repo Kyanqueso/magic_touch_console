@@ -7,7 +7,7 @@ import VouchersTab from './VouchersTab.jsx'
 
 const TABS = [
   { value: 'PO', label: 'PO' },
-  { value: 'SInv', label: 'S Inv' },
+  { value: 'SInv', label: 'Supplier Invoice' },
   { value: 'Vouchers', label: 'Vouchers' },
 ]
 

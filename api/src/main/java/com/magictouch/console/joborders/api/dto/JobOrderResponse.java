@@ -15,6 +15,7 @@ public record JobOrderResponse(
         String customerName,
         JobOrderStatus status,
         String branch,
+        Integer noOfSets,
         String seriesFrom,
         String seriesTo,
         String jobDescription,
@@ -45,7 +46,7 @@ public record JobOrderResponse(
     public static JobOrderResponse from(JobOrder j) {
         return new JobOrderResponse(
                 j.id, j.corporateProfileId, j.customer.id, j.customer.name, j.status,
-                j.branch, j.seriesFrom, j.seriesTo, j.jobDescription, j.specification, j.equipment,
+                j.branch, j.noOfSets, j.seriesFrom, j.seriesTo, j.jobDescription, j.specification, j.equipment,
                 j.dateOrdered, j.deliveryDate, j.customerPoRef,
                 j.atpNo, j.atpDate, j.invoiceNo, j.invoiceDate, j.orNo, j.orDate,
                 j.qty, j.unit, j.size, j.unitPrice, j.operator, j.collator, j.otherInstructions,

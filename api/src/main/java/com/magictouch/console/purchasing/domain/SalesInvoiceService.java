@@ -67,7 +67,7 @@ public class SalesInvoiceService {
         SalesInvoice s = new SalesInvoice();
         s.corporateProfileId = profileId;
         s.purchaseOrder = requirePo(profileId, supplierId, body.purchaseOrderId());
-        apply(s, body);
+        apply(profileId, s, body);
         repo.persist(s);
         return SalesInvoiceResponse.from(s);
     }
@@ -77,7 +77,7 @@ public class SalesInvoiceService {
         SalesInvoice s = require(profileId, supplierId, id);
         requireActive(s);
         s.purchaseOrder = requirePo(profileId, supplierId, body.purchaseOrderId());
-        apply(s, body);
+        apply(profileId, s, body);
         return SalesInvoiceResponse.from(s);
     }
 
@@ -131,9 +131,9 @@ public class SalesInvoiceService {
         return po;
     }
 
-    private void apply(SalesInvoice s, SalesInvoiceRequest b) {
-        lookups.checkAccount("debitAccountId", b.debitAccountId());
-        lookups.checkAccount("creditAccountId", b.creditAccountId());
+    private void apply(long profileId, SalesInvoice s, SalesInvoiceRequest b) {
+        lookups.checkAccount(profileId, "debitAccountId", b.debitAccountId());
+        lookups.checkAccount(profileId, "creditAccountId", b.creditAccountId());
         s.sinvDate = b.sinvDate();
         s.debitAccountId = b.debitAccountId();
         s.creditAccountId = b.creditAccountId();

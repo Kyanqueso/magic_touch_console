@@ -37,7 +37,15 @@ import {
   archiveParty,
   restoreParty,
   deleteParty,
+  linkNewSupplier,
+  getPartyLink,
+  syncLinkedParty,
 } from '../api/parties.js'
+
+// Identity/registration fields eligible for the "sync to the linked party?"
+// prompt — commercial terms (termsDays, WTAX ATC 1/2) are never synced, since
+// the two sides can carry different terms with the same company.
+const IDENTITY_KEYS = ['name', 'address', 'tin', 'branchCode', 'companyType', 'taxType']
 
 const READONLY_KEYS = new Set(['id', 'scope', 'dateAdded'])
 
@@ -99,9 +107,29 @@ export default function EntityListPage({
   const [alert, setAlert] = useAutoAlert()
   const [addOpen, setAddOpen] = useState(false)
   const [detail, setDetail] = useState(null)
+  const [detailLinkId, setDetailLinkId] = useState(null)
+  const [editDetail, setEditDetail] = useState(false)
+  const [pendingSync, setPendingSync] = useState(null)
   const [pending, setPending] = useState(null)
   const [confirmUndo, setConfirmUndo] = useState(false)
   const [confirmSave, setConfirmSave] = useState(false)
+
+  // A linked party (customer <-> supplier created together) is only a
+  // profile-scoped concept.
+  useEffect(() => {
+    if (!detail || !profileId) {
+      setDetailLinkId(null)
+      return undefined
+    }
+    let cancelled = false
+    getPartyLink(ctx, detail.id)
+      .then((id) => !cancelled && setDetailLinkId(id))
+      .catch(() => !cancelled && setDetailLinkId(null))
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail, profileId])
 
   const edit = useTableEdit(async (draft, removedIds) => {
     await Promise.all([
@@ -200,16 +228,69 @@ export default function EntityListPage({
   }
 
   async function handleAdd(values) {
+    let created
     try {
-      await createParty(ctx, values)
+      created = await createParty(ctx, values)
     } catch (e) {
       setAlert({ variant: 'danger', title: `Could not add ${detailNoun}`, message: errMessage(e) })
       throw e // keep the modal open
     }
     setTab('active')
     setPage(1)
-    setAlert({ variant: 'success', title: `${values.name} added successfully!` })
+    if (values.alsoAddSupplier && kind === 'customer' && profileId) {
+      try {
+        await linkNewSupplier(ctx, created.id, values.supplierScope)
+        setAlert({ variant: 'success', title: `${values.name} added, with a linked supplier.` })
+      } catch (e) {
+        // The customer is already created; a failed link here shouldn't look
+        // like the whole add failed.
+        setAlert({
+          variant: 'danger',
+          title: `${values.name} added, but the linked supplier could not be created`,
+          message: errMessage(e),
+        })
+        reload()
+        return
+      }
+    } else {
+      setAlert({ variant: 'success', title: `${values.name} added successfully!` })
+    }
     reload()
+  }
+
+  // Editing the single-row detail (profile-scoped only): if identity fields
+  // changed and this row is linked, ask before pushing the same edit to the
+  // linked party.
+  async function handleEditDetail(values) {
+    const original = detail
+    try {
+      await updateParty(ctx, original.id, values)
+    } catch (e) {
+      setAlert({ variant: 'danger', title: `Could not update ${detailNoun}`, message: errMessage(e) })
+      throw e // keep the modal open
+    }
+    const identityChanged = IDENTITY_KEYS.some(
+      (k) => (values[k] || '') !== (original[k] || ''),
+    )
+    setEditDetail(false)
+    setDetail(null)
+    reload()
+    if (identityChanged && detailLinkId) {
+      setPendingSync({ id: original.id, values })
+    } else {
+      setAlert({ variant: 'success', title: 'Changes saved.' })
+    }
+  }
+
+  async function confirmSyncLinked() {
+    const sync = pendingSync
+    setPendingSync(null)
+    try {
+      await syncLinkedParty(ctx, sync.id, sync.values)
+      setAlert({ variant: 'success', title: 'Changes saved and synced to the linked record.' })
+    } catch (e) {
+      setAlert({ variant: 'danger', title: 'Saved, but the sync failed', message: errMessage(e) })
+    }
   }
 
   const content = (
@@ -488,8 +569,37 @@ export default function EntityListPage({
         title={`Add ${formTitle}`}
         submitLabel="Add"
         scopeLocked={!profileId}
+        offerLinkedSupplier={kind === 'customer' && Boolean(profileId)}
         entityLabel={detailNoun}
       />
+
+      <CompanyFormModal
+        open={editDetail}
+        onClose={() => setEditDetail(false)}
+        onSubmit={handleEditDetail}
+        title={`Edit ${formTitle}`}
+        submitLabel="Save"
+        scopeLocked={!profileId}
+        initial={detail}
+        entityLabel={detailNoun}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingSync)}
+        onClose={() => setPendingSync(null)}
+        title="Sync Linked Record"
+        confirmLabel="Also Update"
+        cancelLabel="Just This One"
+        loadingLabel="Syncing..."
+        confirmVariant="info"
+        confirmIcon={<Save className="h-4 w-4" />}
+        onConfirm={confirmSyncLinked}
+      >
+        <p>
+          This {detailNoun} is linked to another record. Also update the linked record&apos;s
+          name, address, TIN, branch code, company type, and tax type to match?
+        </p>
+      </ConfirmDialog>
 
       <LeaveEditDialog
         open={Boolean(leaveTo)}
@@ -542,7 +652,23 @@ export default function EntityListPage({
         description={detail?.id}
         icon={<Building2 />}
       >
-        {detail && <CompanyDetail row={detail} columns={columns} />}
+        {detail && (
+          <>
+            {profileId && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEditDetail(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-info px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-info-hover"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </button>
+              </div>
+            )}
+            <CompanyDetail row={detail} columns={columns} />
+          </>
+        )}
       </Modal>
     </>
   )

@@ -11,7 +11,7 @@ import java.time.LocalDate;
 
 public record JobOrderRequest(
         @NotNull Long customerId,
-        @Size(max = 80) String branch,
+        @PositiveOrZero Integer noOfSets,
         @Size(max = 20) String seriesFrom,
         @Size(max = 20) String seriesTo,
         @Size(max = 160) String jobDescription,

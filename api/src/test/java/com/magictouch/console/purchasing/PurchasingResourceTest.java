@@ -50,7 +50,7 @@ class PurchasingResourceTest extends AuthenticatedApiTest {
         materialId = given().contentType("application/json")
                 .body("{ \"group\": \"Newsprint\", \"code\": \"%s\", \"name\": \"Newsprint White\", \"unitPrice\": 0.50 }"
                         .formatted(matCode))
-                .when().post("/api/v1/materials")
+                .when().post("/api/v1/profiles/" + profileId + "/materials")
                 .then().statusCode(201).extract().jsonPath().getLong("id");
 
         poBase = "/api/v1/profiles/" + profileId + "/suppliers/" + supplierId + "/purchase-orders";

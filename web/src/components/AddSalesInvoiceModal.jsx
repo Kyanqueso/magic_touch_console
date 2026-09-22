@@ -49,7 +49,7 @@ export default function AddSalesInvoiceModal({ open, onClose, onSubmit, initial,
     <Modal
       open={open}
       onClose={loading ? undefined : onClose}
-      title={initial ? 'Edit S Invoice' : 'Add S Invoice'}
+      title={initial ? 'Edit Supplier Invoice' : 'Add Supplier Invoice'}
       icon={<FileText />}
       accent="success"
     >

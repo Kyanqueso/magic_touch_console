@@ -7,7 +7,7 @@ import Select from './Select.jsx'
 import Combobox from './Combobox.jsx'
 import NumberField from './NumberField.jsx'
 import NoteField from './NoteField.jsx'
-import { ACCOUNT_CLASSES } from '../lib/options.js'
+import { ACCOUNT_CLASSES, SCOPES } from '../lib/options.js'
 
 const EMPTY = {
   category: '',
@@ -18,10 +18,13 @@ const EMPTY = {
   atcCode: '',
   taxRate: '',
   referenceForm: '',
+  scope: 'Local',
 }
 
 // `onAdd(values)` should return a promise; the modal closes once it resolves.
 // `values.category` is free text — it may be an existing category or a new one.
+// `scopeLocked` hides the Local/Global picker and forces scope to 'Global'
+// (used by the top-level Chart of Accounts page).
 export default function AddAccountModal({
   open,
   onClose,
@@ -29,18 +32,22 @@ export default function AddAccountModal({
   categories,
   subTypes,
   defaultCategory = '',
+  scopeLocked = false,
 }) {
-  const [form, setForm] = useState(EMPTY)
+  const [form, setForm] = useState(() => ({
+    ...EMPTY,
+    scope: scopeLocked ? 'Global' : EMPTY.scope,
+  }))
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (open) {
-      setForm({ ...EMPTY, category: defaultCategory })
+      setForm({ ...EMPTY, category: defaultCategory, scope: scopeLocked ? 'Global' : EMPTY.scope })
       setErrors({})
       setLoading(false)
     }
-  }, [open, defaultCategory])
+  }, [open, defaultCategory, scopeLocked])
 
   function set(key, value) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -166,6 +173,28 @@ export default function AddAccountModal({
           onChange={(v) => set('referenceForm', v)}
           disabled={loading}
         />
+
+        {!scopeLocked && (
+          <div>
+            <label className="mb-2 block text-base font-bold text-content">Scope</label>
+            <div className="flex flex-wrap gap-2">
+              {SCOPES.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => set('scope', s)}
+                  className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                    form.scope === s
+                      ? 'border-purple bg-purple-light text-content'
+                      : 'border-purple-light bg-white text-content-muted hover:border-purple'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="dark" size="sm" onClick={onClose} disabled={loading}>

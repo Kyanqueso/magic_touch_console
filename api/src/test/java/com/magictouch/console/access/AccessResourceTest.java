@@ -17,8 +17,8 @@ import static org.hamcrest.Matchers.notNullValue;
 @QuarkusTest
 class AccessResourceTest extends AuthenticatedApiTest {
 
-    /** Seeded modules — V002 plus `materials` from V004. Bump when a module is added. */
-    private static final int MODULE_COUNT = 6;
+    /** Seeded modules — V002, minus `materials` (removed in V010: Inventory now rides on job_orders). Bump when a module is added. */
+    private static final int MODULE_COUNT = 5;
 
     private static final AtomicInteger SEQ = new AtomicInteger();
 
@@ -40,7 +40,7 @@ class AccessResourceTest extends AuthenticatedApiTest {
                 .then().statusCode(200)
                 .body("key", contains(
                         "corporate_profiles", "chart_of_accounts", "customers",
-                        "suppliers", "materials", "job_orders"));
+                        "suppliers", "job_orders"));
     }
 
     @Test

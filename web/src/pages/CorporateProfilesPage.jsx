@@ -127,6 +127,11 @@ export default function CorporateProfilesPage() {
       : [
           { label: 'Corporate Profiles', onClick: closeProfile },
           {
+            label: 'Chart of Accounts',
+            onClick: () => setProfileSection('accounts'),
+            active: profileSection === 'accounts',
+          },
+          {
             label: 'Customers',
             onClick: () => setProfileSection('customers'),
             active: profileSection === 'customers',
@@ -136,12 +141,19 @@ export default function CorporateProfilesPage() {
             onClick: () => setProfileSection('suppliers'),
             active: profileSection === 'suppliers',
           },
+          // Inventory has no module of its own - it rides on Job Orders, so
+          // both appear together, gated on the same profile toggle.
           ...(selected.jobOrdersEnabled
             ? [
                 {
                   label: 'Job Orders',
                   onClick: () => setProfileSection('job-orders'),
                   active: profileSection === 'job-orders',
+                },
+                {
+                  label: 'Inventory',
+                  onClick: () => setProfileSection('inventory'),
+                  active: profileSection === 'inventory',
                 },
               ]
             : []),

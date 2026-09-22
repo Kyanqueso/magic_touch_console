@@ -50,8 +50,8 @@ public class PurchaseOrderResource {
 
     @GET
     @Path("material-options")
-    public java.util.List<MaterialOption> materialOptions() {
-        return service.materialOptions();
+    public java.util.List<MaterialOption> materialOptions(@PathParam("profileId") long profileId) {
+        return service.materialOptions(profileId);
     }
 
     @GET

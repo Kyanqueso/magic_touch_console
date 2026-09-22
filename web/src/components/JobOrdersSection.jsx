@@ -40,6 +40,7 @@ import {
   restoreJobOrder,
   deleteJobOrder,
 } from '../api/jobOrders.js'
+import { createParty } from '../api/parties.js'
 
 const TABS = [
   { value: 'active', label: 'Active' },
@@ -86,7 +87,7 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
   const [selectedId, setSelectedId] = useState(null)
   const [selectedJob, setSelectedJob] = useState(null)
 
-  const [customerOptions, setCustomerOptions] = useState([])
+  const [companies, setCompanies] = useState([])
   const [materialOptions, setMaterialOptions] = useState([])
 
   const [query, setQuery] = useState('')
@@ -103,14 +104,14 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
 
   const term = query.trim().toLowerCase()
 
-  // catalog lookups for the customer / material pickers (works without a
+  // catalog lookups for the company/branch + material pickers (works without a
   // customers/materials grant — the endpoint is gated by job_orders)
   useEffect(() => {
     let cancelled = false
     getJobOrderLookups(profileId)
-      .then(({ customers, materials }) => {
+      .then(({ companies: c, materials }) => {
         if (cancelled) return
-        setCustomerOptions(customers)
+        setCompanies(c)
         setMaterialOptions(materials)
       })
       .catch(() => {})
@@ -118,6 +119,22 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
       cancelled = true
     }
   }, [profileId])
+
+  // A branch typed in the Add Job Order form that doesn't exist yet becomes a
+  // new Local customer record for that company, scoped to this profile.
+  async function handleCreateBranch(companyName, branchCode) {
+    const created = await createParty(
+      { kind: 'customer', profileId: String(profileId) },
+      { name: companyName, branchCode, scope: 'Local' },
+    )
+    getJobOrderLookups(profileId)
+      .then(({ companies: c, materials }) => {
+        setCompanies(c)
+        setMaterialOptions(materials)
+      })
+      .catch(() => {})
+    return created.id
+  }
 
   // list
   useEffect(() => {
@@ -270,7 +287,6 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
       <JobOrderDetail
         job={selectedJob}
         profileId={profileId}
-        customerOptions={customerOptions}
         materialOptions={materialOptions}
         onBack={() => setSelectedId(null)}
         onSaved={(fresh) => setSelectedJob(fresh)}
@@ -551,7 +567,8 @@ export default function JobOrdersSection({ profileId, profileName, onBack }) {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onAdd={handleAdd}
-        customerOptions={customerOptions}
+        companies={companies}
+        onCreateBranch={handleCreateBranch}
       />
 
       <LeaveEditDialog

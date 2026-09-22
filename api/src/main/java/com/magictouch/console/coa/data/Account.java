@@ -1,6 +1,7 @@
 package com.magictouch.console.coa.data;
 
 import com.magictouch.console.common.entity.BaseEntity;
+import com.magictouch.console.common.model.Scope;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -16,6 +17,13 @@ import java.time.OffsetDateTime;
 @Entity
 @Table(name = "chart_of_accounts")
 public class Account extends BaseEntity {
+
+    @Column(name = "corporate_profile_id")
+    public Long corporateProfileId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 6)
+    public Scope scope;
 
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "account_category_id", nullable = false)

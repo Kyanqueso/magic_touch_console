@@ -49,8 +49,12 @@ const TABS = [
   { value: 'archive', label: 'Archive' },
 ]
 
+const SCOPE_DOT = { Global: 'bg-info', Local: 'bg-success' }
+const READONLY_KEYS = new Set(['scope'])
+
 // `edit` mirrors the Add Account form, so the table offers the same choices.
 const COLUMNS = [
+  { key: 'scope', label: 'Scope' },
   { key: 'code', label: 'Account Code' },
   { key: 'title', label: 'Account Title' },
   { key: 'type', label: 'Type', edit: { select: ACCOUNT_CLASSES } },
@@ -80,7 +84,13 @@ function makeSorter(sort) {
   }
 }
 
-export default function ChartOfAccountsPage() {
+export default function ChartOfAccountsPage({
+  embedded = false,
+  profileId = null,
+  scopeOptions = [],
+}) {
+  const ctx = { profileId: profileId ? String(profileId) : null }
+
   const [accounts, setAccounts] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
@@ -90,6 +100,7 @@ export default function ChartOfAccountsPage() {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('')
   const [tab, setTab] = useState('active')
+  const [scope, setScope] = useState('All')
   const [expanded, setExpanded] = useState(() => new Set())
   const [alert, setAlert] = useAutoAlert()
   const [addOpen, setAddOpen] = useState(false)
@@ -101,7 +112,7 @@ export default function ChartOfAccountsPage() {
     let cancelled = false
     setLoading(true)
     const t = setTimeout(() => {
-      Promise.all([listCategories(), listAccounts({ tab, q: query.trim(), sort })])
+      Promise.all([listCategories(ctx), listAccounts(ctx, { tab, q: query.trim(), sort, scope })])
         .then(([cats, accs]) => {
           if (cancelled) return
           setCategories(cats)
@@ -131,7 +142,7 @@ export default function ChartOfAccountsPage() {
       clearTimeout(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, query, sort, reloadKey])
+  }, [profileId, tab, query, sort, scope, reloadKey])
 
   // Edit mode (one category at a time) + undo history for Ctrl+Z.
   const [editingId, setEditingId] = useState(null)
@@ -264,8 +275,8 @@ export default function ChartOfAccountsPage() {
     })
     try {
       await Promise.all([
-        ...changed.map((r) => updateAccount(r.id, r)),
-        ...removedIds.map((id) => archiveAccount(id)),
+        ...changed.map((r) => updateAccount(ctx, r.id, r)),
+        ...removedIds.map((id) => archiveAccount(ctx, id)),
       ])
       setAlert({ variant: 'success', title: 'Changes saved.' })
       exitEdit()
@@ -277,7 +288,7 @@ export default function ChartOfAccountsPage() {
 
   async function handleAddAccount(values) {
     try {
-      await createAccount(values)
+      await createAccount(ctx, values)
     } catch (e) {
       setAlert({ variant: 'danger', title: 'Could not add account', message: errMessage(e) })
       throw e // keep the modal open
@@ -292,9 +303,9 @@ export default function ChartOfAccountsPage() {
     const { action, items } = pending
     const ids = items.map((it) => it.id)
     try {
-      if (action === 'delete') await Promise.all(ids.map((id) => deleteAccount(id)))
-      else if (action === 'restore') await Promise.all(ids.map((id) => restoreAccount(id)))
-      else await Promise.all(ids.map((id) => archiveAccount(id)))
+      if (action === 'delete') await Promise.all(ids.map((id) => deleteAccount(ctx, id)))
+      else if (action === 'restore') await Promise.all(ids.map((id) => restoreAccount(ctx, id)))
+      else await Promise.all(ids.map((id) => archiveAccount(ctx, id)))
       setAlert(actionAlert(action, items, 'account'))
       reload()
     } catch (e) {
@@ -312,12 +323,11 @@ export default function ChartOfAccountsPage() {
     setPending({ action: 'delete', items: [toItem(row)] })
   }
 
-  return (
-    <div className="min-h-full bg-component-bg">
-      <AppHeader />
-
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        <h1 className="text-2xl font-extrabold text-content">Chart of Accounts</h1>
+  const content = (
+    <>
+        {!embedded && (
+          <h1 className="text-2xl font-extrabold text-content">Chart of Accounts</h1>
+        )}
 
         {/* Controls */}
         <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center">
@@ -382,6 +392,26 @@ export default function ChartOfAccountsPage() {
               <Plus className="h-4 w-4" />
               Add
             </button>
+          )}
+
+          {scopeOptions.length > 1 && (
+            <div className="inline-flex overflow-hidden rounded-lg border border-purple-light text-sm">
+              {scopeOptions.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setScope(s)}
+                  className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors ${
+                    scope === s
+                      ? 'bg-secondary-bg text-white'
+                      : 'bg-white text-content hover:bg-component-bg'
+                  }`}
+                >
+                  {SCOPE_DOT[s] && <span className={`h-2 w-2 rounded-full ${SCOPE_DOT[s]}`} />}
+                  {s}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -559,7 +589,6 @@ export default function ChartOfAccountsPage() {
             last change, or use Undo&nbsp;All.
           </p>
         )}
-      </main>
 
       <AddAccountModal
         open={addOpen}
@@ -567,6 +596,7 @@ export default function ChartOfAccountsPage() {
         onAdd={handleAddAccount}
         categories={categories}
         subTypes={ACCOUNT_SUB_TYPES}
+        scopeLocked={!profileId}
       />
 
       <ConfirmDialog
@@ -616,6 +646,15 @@ export default function ChartOfAccountsPage() {
             : 'job orders with this account'
         }
       />
+    </>
+  )
+
+  if (embedded) return content
+
+  return (
+    <div className="min-h-full bg-component-bg">
+      <AppHeader />
+      <main className="mx-auto max-w-6xl px-6 py-8">{content}</main>
     </div>
   )
 }
@@ -648,13 +687,15 @@ function AccountTable({ rows, editing, tab, errors = {}, onCell, onRowAction, on
             <tr key={row.id} className="align-top">
               {COLUMNS.map((c) => (
                 <td key={c.key} className="px-3 py-2">
-                  {editing ? (
+                  {editing && !READONLY_KEYS.has(c.key) ? (
                     <CellEditor
                       spec={c.edit}
                       value={row[c.key]}
                       error={errors[row.id]?.[c.key]}
                       onChange={(v) => onCell(row.id, c.key, v)}
                     />
+                  ) : c.key === 'scope' ? (
+                    <ScopeBadge scope={row[c.key]} />
                   ) : (
                     <span className="text-content">{row[c.key] || '—'}</span>
                   )}
@@ -703,7 +744,7 @@ function AccountCards({ rows, editing, tab, errors = {}, onCell, onRowAction, on
             <div key={row.id} className="px-5 py-3">
               {editing ? (
                 <div className="space-y-2">
-                  {COLUMNS.map((c) => (
+                  {COLUMNS.filter((c) => !READONLY_KEYS.has(c.key)).map((c) => (
                     <CellEditor
                       key={c.key}
                       spec={{ placeholder: c.label, ...c.edit }}
@@ -724,7 +765,10 @@ function AccountCards({ rows, editing, tab, errors = {}, onCell, onRowAction, on
               ) : (
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold text-content">{row.code}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-content">{row.code}</p>
+                      <ScopeBadge scope={row.scope} />
+                    </div>
                     <p className="truncate text-sm text-content">{row.title || '—'}</p>
                     <p className="mt-0.5 text-xs text-content-muted">
                       {[
@@ -789,5 +833,18 @@ function RowActionButton({ editing, tab, onClick, onDelete }) {
     >
       <Archive className="h-4 w-4" />
     </button>
+  )
+}
+
+function ScopeBadge({ scope }) {
+  if (!scope) return <span className="text-content-muted">—</span>
+  const style = scope === 'Global' ? 'bg-info/15 text-info' : 'bg-success/15 text-success'
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${style}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${scope === 'Global' ? 'bg-info' : 'bg-success'}`} />
+      {scope}
+    </span>
   )
 }

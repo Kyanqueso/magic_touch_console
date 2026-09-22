@@ -68,8 +68,8 @@ public class PurchaseOrderService {
 
     // Material picker for the PO screen. Gated by the suppliers module (the PO path),
     // so a purchasing user needs no materials grant of their own.
-    public List<MaterialOption> materialOptions() {
-        return materials.search(false, null, null, Sort.by("code"))
+    public List<MaterialOption> materialOptions(long profileId) {
+        return materials.search(profileId, false, null, null, Sort.by("code"))
                 .list().stream().map(MaterialOption::from).toList();
     }
 
@@ -134,7 +134,7 @@ public class PurchaseOrderService {
         PurchaseOrderItem item = new PurchaseOrderItem();
         item.purchaseOrder = po;
         item.lineNo = po.nextLineNo();
-        applyItem(item, body);
+        applyItem(profileId, item, body);
         po.items.add(item);
         repo.getEntityManager().flush();
         return PurchaseOrderItemResponse.from(item);
@@ -148,7 +148,7 @@ public class PurchaseOrderService {
         PurchaseOrderItem item = po.items.stream()
                 .filter(i -> i.id.equals(itemId)).findFirst()
                 .orElseThrow(() -> ApiException.notFound("Line item"));
-        applyItem(item, body);
+        applyItem(profileId, item, body);
         return PurchaseOrderItemResponse.from(item);
     }
 
@@ -188,9 +188,9 @@ public class PurchaseOrderService {
         po.approvedDate = b.approvedDate();
     }
 
-    private void applyItem(PurchaseOrderItem item, PurchaseOrderItemRequest b) {
+    private void applyItem(long profileId, PurchaseOrderItem item, PurchaseOrderItemRequest b) {
         Material material = b.materialId() == null ? null : materials.findById(b.materialId());
-        if (material == null || material.isArchived()) {
+        if (material == null || !Objects.equals(material.corporateProfileId, profileId) || material.isArchived()) {
             throw ApiException.invalidField("materialId", "No such active material.");
         }
         item.material = material;

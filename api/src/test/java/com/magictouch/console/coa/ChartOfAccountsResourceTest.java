@@ -29,6 +29,7 @@ class ChartOfAccountsResourceTest extends AuthenticatedApiTest {
         given().contentType("application/json")
                 .body("""
                     {
+                      "scope": "GLOBAL",
                       "category": "Assets (10000 Series)",
                       "accountClass": "ASSET",
                       "subType": "Current Asset",
@@ -47,6 +48,7 @@ class ChartOfAccountsResourceTest extends AuthenticatedApiTest {
         given().contentType("application/json")
                 .body("""
                     {
+                      "scope": "GLOBAL",
                       "category": "Contra Assets (15000 Series)",
                       "accountClass": "ASSET",
                       "code": "15100",
@@ -66,13 +68,13 @@ class ChartOfAccountsResourceTest extends AuthenticatedApiTest {
     void rejectsDuplicateCode() {
         given().contentType("application/json")
                 .body("""
-                    { "category": "Equity (30000 Series)", "accountClass": "EQUITY", "code": "30100", "name": "Owner Capital" }
+                    { "scope": "GLOBAL", "category": "Equity (30000 Series)", "accountClass": "EQUITY", "code": "30100", "name": "Owner Capital" }
                     """)
                 .when().post(ACCOUNTS).then().statusCode(201);
 
         given().contentType("application/json")
                 .body("""
-                    { "category": "Equity (30000 Series)", "accountClass": "EQUITY", "code": "30100", "name": "Duplicate" }
+                    { "scope": "GLOBAL", "category": "Equity (30000 Series)", "accountClass": "EQUITY", "code": "30100", "name": "Duplicate" }
                     """)
                 .when().post(ACCOUNTS)
                 .then().statusCode(409)
@@ -83,7 +85,7 @@ class ChartOfAccountsResourceTest extends AuthenticatedApiTest {
     void rejectsOutOfRangeTaxRate() {
         given().contentType("application/json")
                 .body("""
-                    { "category": "Expenses (60000 Series)", "accountClass": "EXPENSE", "code": "60999", "name": "Bad Rate", "taxRate": 150 }
+                    { "scope": "GLOBAL", "category": "Expenses (60000 Series)", "accountClass": "EXPENSE", "code": "60999", "name": "Bad Rate", "taxRate": 150 }
                     """)
                 .when().post(ACCOUNTS)
                 .then().statusCode(400)
@@ -98,7 +100,7 @@ class ChartOfAccountsResourceTest extends AuthenticatedApiTest {
 
         String location = given().contentType("application/json")
                 .body("""
-                    { "category": "Revenue (40000 Series)", "accountClass": "REVENUE", "code": "40100", "name": "Sales Revenue" }
+                    { "scope": "GLOBAL", "category": "Revenue (40000 Series)", "accountClass": "REVENUE", "code": "40100", "name": "Sales Revenue" }
                     """)
                 .when().post(ACCOUNTS).then().statusCode(201)
                 .extract().header("Location");

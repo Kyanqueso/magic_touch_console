@@ -2,12 +2,15 @@ package com.magictouch.console.coa.api.dto;
 
 import com.magictouch.console.coa.data.Account;
 import com.magictouch.console.coa.data.AccountClass;
+import com.magictouch.console.common.model.Scope;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 public record AccountResponse(
         Long id,
+        Long corporateProfileId,
+        Scope scope,
         Long categoryId,
         String categoryName,
         AccountClass accountClass,
@@ -24,7 +27,7 @@ public record AccountResponse(
 
     public static AccountResponse from(Account a) {
         return new AccountResponse(
-                a.id, a.category.id, a.category.name,
+                a.id, a.corporateProfileId, a.scope, a.category.id, a.category.name,
                 a.accountClass, a.subType, a.code, a.name,
                 a.atcCode, a.taxRate, a.referenceForm,
                 a.isArchived(), a.createdAt, a.updatedAt);

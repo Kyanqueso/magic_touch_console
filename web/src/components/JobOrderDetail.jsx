@@ -18,7 +18,6 @@ import {
 } from 'lucide-react'
 import Button from './Button.jsx'
 import Select from './Select.jsx'
-import Combobox from './Combobox.jsx'
 import DateField from './DateField.jsx'
 import NumberField from './NumberField.jsx'
 import NoteField from './NoteField.jsx'
@@ -33,7 +32,6 @@ import { peso, formatDate } from '../lib/format.js'
 import { printDocument } from '../lib/print.js'
 import { blankMaterial, saveJobOrderDraft } from '../api/jobOrders.js'
 
-const BRANCHES = ['Main Branch', 'Lapuz', 'Mandurriao', 'Jaro', 'Molo']
 const EQUIPMENT = ['offset', 'riso', 'comcolor', 'digital']
 const UNITS = ['pcs', 'sets', 'booklets', 'pads', 'reams']
 const COLORS = ['Black', 'Blue', 'Red', 'Green', 'None']
@@ -47,7 +45,9 @@ const opt = (list) => list.map((o) => ({ value: o, label: o }))
 const OVERVIEW = [
   ['jobDescription', 'Job Description', 'text'],
   ['specification', 'Specifications', 'text'],
-  ['branch', 'Branch', 'combo', BRANCHES],
+  // Never client input - a snapshot of the resolved customer's own branch code.
+  ['branch', 'Branch', 'readonly'],
+  ['noOfSets', 'No. of Sets', 'number'],
   // Digits only, matching the Add Job Order form — leading zeros are kept.
   ['seriesFrom', 'Series From', 'digits'],
   ['seriesTo', 'Series To', 'digits'],
@@ -92,7 +92,6 @@ function display(value, type) {
 export default function JobOrderDetail({
   job,
   profileId,
-  customerOptions = [],
   materialOptions = [],
   onBack,
   onSaved,
@@ -651,7 +650,7 @@ function Card({ icon: Icon, title, fields, data, editing, errors = {}, onField }
             >
               {label}
             </span>
-            {editing ? (
+            {editing && type !== 'readonly' ? (
               <>
                 <FieldInput
                   type={type}
@@ -687,19 +686,6 @@ function FieldInput({ type, value, options, error, onChange }) {
         value={value}
         onChange={onChange}
         options={opt(options)}
-        invalid={Boolean(error)}
-      />
-    )
-  }
-  if (type === 'combo') {
-    return (
-      <Combobox
-        wrapperClassName="w-full"
-        size="sm"
-        placeholder="Select or type"
-        value={value ?? ''}
-        onChange={onChange}
-        options={options}
         invalid={Boolean(error)}
       />
     )

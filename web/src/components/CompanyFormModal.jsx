@@ -21,11 +21,16 @@ const EMPTY = {
   wtax1: '',
   wtax2: '',
   scope: 'Local',
+  alsoAddSupplier: false,
+  supplierScope: 'Global',
 }
 
 // `onSubmit(values)` should return a promise; the modal closes once it resolves.
 // `scopeLocked` hides the Local/Global picker and forces scope to 'Global'
 // (used by the top-level Customers/Suppliers pages).
+// `offerLinkedSupplier` shows the "Also add as Supplier" checkbox (only makes
+// sense for the profile-embedded Add Customer form).
+// `initial` pre-fills the form from an existing row, for editing rather than adding.
 export default function CompanyFormModal({
   open,
   onClose,
@@ -33,27 +38,36 @@ export default function CompanyFormModal({
   title,
   submitLabel = 'Add',
   scopeLocked = false,
+  offerLinkedSupplier = false,
+  initial = null,
   // Names the record in the "cancel adding the ..." prompt.
   entityLabel = 'company',
 }) {
-  const [form, setForm] = useState(() => ({
-    ...EMPTY,
-    scope: scopeLocked ? 'Global' : EMPTY.scope,
-  }))
+  const startForm = () =>
+    initial
+      ? { ...EMPTY, ...initial, alsoAddSupplier: false, supplierScope: 'Global' }
+      : { ...EMPTY, scope: scopeLocked ? 'Global' : EMPTY.scope }
+
+  const [form, setForm] = useState(startForm)
+  // Editing an existing row: the branch code is already whatever it is: don't
+  // auto-override it from the TIN the way a fresh Add does.
+  const [branchTouched, setBranchTouched] = useState(Boolean(initial))
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
 
   useEffect(() => {
     if (open) {
-      setForm({ ...EMPTY, scope: scopeLocked ? 'Global' : EMPTY.scope })
+      setForm(startForm())
+      setBranchTouched(Boolean(initial))
       setErrors({})
       setLoading(false)
       setConfirmDiscard(false)
     }
-  }, [open, scopeLocked])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, scopeLocked, initial])
 
-  const pristine = { ...EMPTY, scope: scopeLocked ? 'Global' : EMPTY.scope }
+  const pristine = startForm()
   const dirty = Object.keys(pristine).some((k) => form[k] !== pristine[k])
 
   // Closing a form with something in it should not silently bin the work.
@@ -118,7 +132,18 @@ export default function CompanyFormModal({
           inputMode="numeric"
           placeholder="000-000-000-00000"
           value={form.tin}
-          onChange={(e) => set('tin', maskTIN(e.target.value))}
+          onChange={(e) => {
+            const tin = maskTIN(e.target.value)
+            // Branch code auto-fills from the TIN's last 5 digits until the
+            // user types their own — then it stops following the TIN.
+            const digits = tin.replace(/\D/g, '')
+            setForm((f) => ({
+              ...f,
+              tin,
+              branchCode: branchTouched ? f.branchCode : digits.slice(-5),
+            }))
+            setErrors((er) => ({ ...er, tin: undefined }))
+          }}
           error={errors.tin}
           disabled={loading}
         />
@@ -134,7 +159,10 @@ export default function CompanyFormModal({
           <TextField
             label="Branch Code"
             value={form.branchCode}
-            onChange={(e) => set('branchCode', e.target.value)}
+            onChange={(e) => {
+              setBranchTouched(true)
+              set('branchCode', e.target.value)
+            }}
             disabled={loading}
           />
         </div>
@@ -190,6 +218,28 @@ export default function CompanyFormModal({
             value={form.scope}
             onChange={(v) => set('scope', v)}
           />
+        )}
+
+        {offerLinkedSupplier && (
+          <div className="space-y-3 rounded-lg border border-purple-light p-4">
+            <label className="flex items-center gap-2 text-sm font-bold text-content">
+              <input
+                type="checkbox"
+                checked={form.alsoAddSupplier}
+                onChange={(e) => set('alsoAddSupplier', e.target.checked)}
+                disabled={loading}
+              />
+              Also add as Supplier
+            </label>
+            {form.alsoAddSupplier && (
+              <PillGroup
+                label="Supplier Scope"
+                options={SCOPES}
+                value={form.supplierScope}
+                onChange={(v) => set('supplierScope', v)}
+              />
+            )}
+          </div>
         )}
 
         <div className="flex justify-end gap-3 pt-2">

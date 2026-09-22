@@ -45,6 +45,11 @@ public class JobOrder extends BaseEntity {
     @Column(name = "series_to", length = 20)
     public String seriesTo;
 
+    // Drives qty/seriesTo (qty = noOfSets * 50) when set; null for job orders
+    // entering qty/seriesTo by hand.
+    @Column(name = "no_of_sets")
+    public Integer noOfSets;
+
     @Column(name = "job_description", length = 160)
     public String jobDescription;
 

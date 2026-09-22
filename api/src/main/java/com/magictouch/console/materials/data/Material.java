@@ -15,6 +15,9 @@ import java.time.OffsetDateTime;
 @Table(name = "materials")
 public class Material extends BaseEntity {
 
+    @Column(name = "corporate_profile_id", nullable = false)
+    public Long corporateProfileId;
+
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "material_group_id", nullable = false)
     public MaterialGroup materialGroup;

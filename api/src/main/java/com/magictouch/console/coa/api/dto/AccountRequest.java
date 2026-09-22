@@ -1,6 +1,7 @@
 package com.magictouch.console.coa.api.dto;
 
 import com.magictouch.console.coa.data.AccountClass;
+import com.magictouch.console.common.model.Scope;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -12,6 +13,7 @@ import java.math.BigDecimal;
 
 /** {@code category} is free text — an existing category name or a new one. */
 public record AccountRequest(
+        @NotNull Scope scope,
         @NotBlank @Size(max = 120) String category,
         @NotNull AccountClass accountClass,
         @Size(max = 40) String subType,

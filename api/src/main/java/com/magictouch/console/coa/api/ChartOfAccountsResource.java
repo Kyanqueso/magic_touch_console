@@ -41,20 +41,20 @@ public class ChartOfAccountsResource {
             @QueryParam("q") String q,
             @QueryParam("categoryId") Long categoryId,
             @QueryParam("tab") @DefaultValue("active") String tab) {
-        return service.list(PageQuery.of(page, size), sort, q,
+        return service.listGlobal(PageQuery.of(page, size), sort, q,
                 "archive".equalsIgnoreCase(tab), categoryId);
     }
 
     @GET
     @Path("{id}")
     public AccountResponse get(@PathParam("id") long id) {
-        return service.get(id);
+        return service.getGlobal(id);
     }
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     public Response create(@Valid AccountRequest body, @Context UriInfo uriInfo) {
-        AccountResponse created = service.create(body);
+        AccountResponse created = service.createGlobal(body);
         return Response
                 .created(uriInfo.getAbsolutePathBuilder().path(String.valueOf(created.id())).build())
                 .entity(created)
@@ -65,27 +65,27 @@ public class ChartOfAccountsResource {
     @Path("{id}")
     @Consumes(MediaType.APPLICATION_JSON)
     public AccountResponse update(@PathParam("id") long id, @Valid AccountRequest body) {
-        return service.update(id, body);
+        return service.updateGlobal(id, body);
     }
 
     @POST
     @Path("{id}/archive")
     public Response archive(@PathParam("id") long id) {
-        service.archive(id);
+        service.archiveGlobal(id);
         return Response.noContent().build();
     }
 
     @POST
     @Path("{id}/restore")
     public Response restore(@PathParam("id") long id) {
-        service.restore(id);
+        service.restoreGlobal(id);
         return Response.noContent().build();
     }
 
     @DELETE
     @Path("{id}")
     public Response delete(@PathParam("id") long id) {
-        service.delete(id);
+        service.deleteGlobal(id);
         return Response.noContent().build();
     }
 }

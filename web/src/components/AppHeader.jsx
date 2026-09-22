@@ -12,7 +12,6 @@ export const NAV_ITEMS = [
   { label: 'Chart of Accounts', to: '/chart-of-accounts', moduleKey: 'chart_of_accounts' },
   { label: 'Customers', to: '/customers', moduleKey: 'customers' },
   { label: 'Suppliers', to: '/suppliers', moduleKey: 'suppliers' },
-  { label: 'Materials', to: '/materials', moduleKey: 'materials' },
   { label: 'My Profile', to: '/my-profile' },
 ]
 

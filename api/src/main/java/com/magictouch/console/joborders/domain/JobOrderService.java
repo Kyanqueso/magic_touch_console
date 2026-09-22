@@ -7,7 +7,8 @@ import com.magictouch.console.common.page.PageResponse;
 import com.magictouch.console.common.page.SortSpec;
 import com.magictouch.console.directory.data.Customer;
 import com.magictouch.console.directory.data.CustomerRepository;
-import com.magictouch.console.joborders.api.dto.CustomerOption;
+import com.magictouch.console.joborders.api.dto.BranchOption;
+import com.magictouch.console.joborders.api.dto.CompanyOption;
 import com.magictouch.console.joborders.api.dto.JobOrderLookups;
 import com.magictouch.console.joborders.api.dto.JobOrderMaterialRequest;
 import com.magictouch.console.joborders.api.dto.JobOrderMaterialResponse;
@@ -29,6 +30,7 @@ import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,13 +76,22 @@ public class JobOrderService {
     // no customers/materials grant of their own to fill these dropdowns.
     public JobOrderLookups lookups(long profileId) {
         profileGuard.require(profileId);
-        List<CustomerOption> custs = customers
+        List<Customer> custs = customers
                 .findVisible(profileId, false, null, null, Sort.by("name"))
-                .list().stream().map(CustomerOption::from).toList();
+                .list();
+        // Group by company name: each customer row is one branch of that company.
+        Map<String, List<BranchOption>> byName = new LinkedHashMap<>();
+        for (Customer c : custs) {
+            byName.computeIfAbsent(c.name, k -> new ArrayList<>())
+                    .add(new BranchOption(c.id, c.branchCode));
+        }
+        List<CompanyOption> companies = byName.entrySet().stream()
+                .map(e -> new CompanyOption(e.getKey(), e.getValue()))
+                .toList();
         List<MaterialOption> mats = materials
-                .search(false, null, null, Sort.by("code"))
+                .search(profileId, false, null, null, Sort.by("code"))
                 .list().stream().map(MaterialOption::from).toList();
-        return new JobOrderLookups(custs, mats);
+        return new JobOrderLookups(companies, mats);
     }
 
     // Full job orders for one customer, in a single query, for the summary screen.
@@ -168,7 +179,7 @@ public class JobOrderService {
         JobOrderMaterial m = new JobOrderMaterial();
         m.jobOrder = j;
         m.lineNo = j.nextLineNo();
-        applyMaterial(m, body);
+        applyMaterial(profileId, m, body);
         j.materials.add(m);
         jobOrders.getEntityManager().flush();
         return JobOrderMaterialResponse.from(m);
@@ -183,7 +194,7 @@ public class JobOrderService {
         JobOrderMaterial m = j.materials.stream()
                 .filter(x -> x.id.equals(materialLineId)).findFirst()
                 .orElseThrow(() -> ApiException.notFound("Material line"));
-        applyMaterial(m, body);
+        applyMaterial(profileId, m, body);
         return JobOrderMaterialResponse.from(m);
     }
 
@@ -232,10 +243,15 @@ public class JobOrderService {
         return c;
     }
 
+    // A "set" is fixed at 50 units for now (not yet configurable per job/material).
+    private static final int SET_SIZE = 50;
+
     private void applyScalars(JobOrder j, JobOrderRequest b) {
-        j.branch = b.branch();
+        // branch is never client input: it's a snapshot of the resolved customer's
+        // own branch code, so it can never disagree with the FK it was picked from.
+        j.branch = j.customer.branchCode;
         j.seriesFrom = b.seriesFrom();
-        j.seriesTo = b.seriesTo();
+        applySets(j, b);
         j.jobDescription = b.jobDescription();
         j.specification = b.specification();
         j.equipment = b.equipment();
@@ -248,7 +264,6 @@ public class JobOrderService {
         j.invoiceDate = b.invoiceDate();
         j.orNo = b.orNo();
         j.orDate = b.orDate();
-        j.qty = b.qty();
         j.unit = b.unit();
         j.size = b.size();
         j.unitPrice = b.unitPrice();
@@ -257,9 +272,26 @@ public class JobOrderService {
         j.otherInstructions = b.otherInstructions();
     }
 
-    private void applyMaterial(JobOrderMaterial m, JobOrderMaterialRequest b) {
+    // qty and seriesTo are authoritative from noOfSets whenever it's supplied
+    // (qty = sets * 50, seriesTo = seriesFrom + qty); otherwise both fall back
+    // to whatever the client sent, preserving manual entry for job orders that
+    // don't use sets.
+    private void applySets(JobOrder j, JobOrderRequest b) {
+        j.noOfSets = b.noOfSets();
+        if (b.noOfSets() == null) {
+            j.qty = b.qty();
+            j.seriesTo = b.seriesTo();
+            return;
+        }
+        int qty = b.noOfSets() * SET_SIZE;
+        j.qty = qty;
+        Long from = asLong(b.seriesFrom());
+        j.seriesTo = from != null ? String.valueOf(from + qty) : b.seriesTo();
+    }
+
+    private void applyMaterial(long profileId, JobOrderMaterial m, JobOrderMaterialRequest b) {
         Material material = b.materialId() == null ? null : materials.findById(b.materialId());
-        if (material == null || material.isArchived()) {
+        if (material == null || !Objects.equals(material.corporateProfileId, profileId) || material.isArchived()) {
             throw ApiException.invalidField("materialId", "No such active material.");
         }
         m.material = material;

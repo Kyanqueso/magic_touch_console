@@ -1,13 +1,11 @@
-package com.magictouch.console.directory.api;
+package com.magictouch.console.coa.api;
 
+import com.magictouch.console.coa.api.dto.AccountRequest;
+import com.magictouch.console.coa.api.dto.AccountResponse;
+import com.magictouch.console.coa.domain.ChartOfAccountsService;
 import com.magictouch.console.common.model.Scopes;
 import com.magictouch.console.common.page.PageQuery;
 import com.magictouch.console.common.page.PageResponse;
-import com.magictouch.console.directory.api.dto.LinkedPartyResponse;
-import com.magictouch.console.directory.api.dto.PartyRequest;
-import com.magictouch.console.directory.api.dto.PartyResponse;
-import com.magictouch.console.directory.domain.PartyLinkService;
-import com.magictouch.console.directory.domain.SupplierService;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
@@ -25,43 +23,43 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
-@Path("/api/v1/profiles/{profileId}/suppliers")
+/** A corporate profile's own chart of accounts: its Local accounts, plus every Global one. */
+@Path("/api/v1/profiles/{profileId}/accounts")
 @Produces(MediaType.APPLICATION_JSON)
-@Tag(name = "Suppliers")
-public class SupplierResource {
+@Tag(name = "Chart of Accounts")
+public class AccountResource {
 
-    private final SupplierService service;
-    private final PartyLinkService links;
+    private final ChartOfAccountsService service;
 
-    public SupplierResource(SupplierService service, PartyLinkService links) {
+    public AccountResource(ChartOfAccountsService service) {
         this.service = service;
-        this.links = links;
     }
 
     @GET
-    public PageResponse<PartyResponse> list(
+    public PageResponse<AccountResponse> list(
             @PathParam("profileId") long profileId,
             @QueryParam("page") Integer page,
             @QueryParam("size") Integer size,
             @QueryParam("sort") String sort,
             @QueryParam("q") String q,
             @QueryParam("scope") String scope,
+            @QueryParam("categoryId") Long categoryId,
             @QueryParam("tab") @DefaultValue("active") String tab) {
         return service.list(profileId, PageQuery.of(page, size), sort, q,
-                Scopes.filter(scope), "archive".equalsIgnoreCase(tab));
+                Scopes.filter(scope), "archive".equalsIgnoreCase(tab), categoryId);
     }
 
     @GET
     @Path("{id}")
-    public PartyResponse get(@PathParam("profileId") long profileId, @PathParam("id") long id) {
+    public AccountResponse get(@PathParam("profileId") long profileId, @PathParam("id") long id) {
         return service.get(profileId, id);
     }
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response create(@PathParam("profileId") long profileId, @Valid PartyRequest body,
+    public Response create(@PathParam("profileId") long profileId, @Valid AccountRequest body,
                            @Context UriInfo uriInfo) {
-        PartyResponse created = service.create(profileId, body);
+        AccountResponse created = service.create(profileId, body);
         return Response
                 .created(uriInfo.getAbsolutePathBuilder().path(String.valueOf(created.id())).build())
                 .entity(created)
@@ -71,8 +69,8 @@ public class SupplierResource {
     @PUT
     @Path("{id}")
     @Consumes(MediaType.APPLICATION_JSON)
-    public PartyResponse update(@PathParam("profileId") long profileId, @PathParam("id") long id,
-                                @Valid PartyRequest body) {
+    public AccountResponse update(@PathParam("profileId") long profileId, @PathParam("id") long id,
+                                  @Valid AccountRequest body) {
         return service.update(profileId, id, body);
     }
 
@@ -94,23 +92,6 @@ public class SupplierResource {
     @Path("{id}")
     public Response delete(@PathParam("profileId") long profileId, @PathParam("id") long id) {
         service.delete(profileId, id);
-        return Response.noContent().build();
-    }
-
-    // --- linked customer (mirror of CustomerResource's link/sync-linked) ---
-
-    @GET
-    @Path("{id}/link")
-    public LinkedPartyResponse link(@PathParam("profileId") long profileId, @PathParam("id") long id) {
-        return new LinkedPartyResponse(links.linkedCustomerId(profileId, id));
-    }
-
-    @POST
-    @Path("{id}/sync-linked")
-    @Consumes(MediaType.APPLICATION_JSON)
-    public Response syncLinked(@PathParam("profileId") long profileId, @PathParam("id") long id,
-                               @Valid PartyRequest body) {
-        links.syncIdentityToCustomer(profileId, id, body);
         return Response.noContent().build();
     }
 }

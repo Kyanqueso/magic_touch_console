@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Archive,
+  ArrowLeft,
   ChevronDown,
   ChevronRight,
   Loader2,
@@ -12,18 +13,17 @@ import {
   Search,
   Trash2,
 } from 'lucide-react'
-import AppHeader from '../components/AppHeader.jsx'
-import Select from '../components/Select.jsx'
-import Alert from '../components/Alert.jsx'
-import SegmentedTabs from '../components/SegmentedTabs.jsx'
-import ConfirmDialog from '../components/ConfirmDialog.jsx'
-import ActionConfirmDialog, { actionAlert } from '../components/ActionConfirmDialog.jsx'
-import EmptyState from '../components/EmptyState.jsx'
-import AddMaterialModal from '../components/AddMaterialModal.jsx'
-import NumberField from '../components/NumberField.jsx'
-import Loading from '../components/Loading.jsx'
-import EditableCell from '../components/EditableCell.jsx'
-import LeaveEditDialog from '../components/LeaveEditDialog.jsx'
+import Select from './Select.jsx'
+import Alert from './Alert.jsx'
+import SegmentedTabs from './SegmentedTabs.jsx'
+import ConfirmDialog from './ConfirmDialog.jsx'
+import ActionConfirmDialog, { actionAlert } from './ActionConfirmDialog.jsx'
+import EmptyState from './EmptyState.jsx'
+import AddMaterialModal from './AddMaterialModal.jsx'
+import NumberField from './NumberField.jsx'
+import Loading from './Loading.jsx'
+import EditableCell from './EditableCell.jsx'
+import LeaveEditDialog from './LeaveEditDialog.jsx'
 import { validateMaterialRow, validateRows, countErrors } from '../lib/validate.js'
 import { useUnsavedChanges } from '../lib/unsavedChanges.jsx'
 import useAutoAlert from '../hooks/useAutoAlert.js'
@@ -36,7 +36,7 @@ import {
   archiveMaterial,
   restoreMaterial,
   deleteMaterial,
-} from '../api/materials.js'
+} from '../api/inventory.js'
 
 function errMessage(e) {
   if (e?.fields) return Object.values(e.fields).join(' ')
@@ -57,12 +57,6 @@ const SORT_OPTIONS = [
   { value: 'price-desc', label: 'Price: descending' },
 ]
 
-const FIELDS = [
-  { key: 'code', label: 'Material Code' },
-  { key: 'description', label: 'Material Description' },
-  { key: 'unitPrice', label: 'Unit Price' },
-]
-
 function makeSorter(sort) {
   switch (sort) {
     case 'code-desc':
@@ -76,7 +70,9 @@ function makeSorter(sort) {
   }
 }
 
-export default function MaterialsPage() {
+// Inventory (formerly Materials): per corporate profile, riding entirely on
+// the Job Orders module grant — see ModuleRoutes.java, no module of its own.
+export default function InventorySection({ profileId, profileName, onBack }) {
   const [materials, setMaterials] = useState([])
   const [groups, setGroups] = useState([])
   const [loading, setLoading] = useState(true)
@@ -95,7 +91,7 @@ export default function MaterialsPage() {
     let cancelled = false
     setLoading(true)
     const t = setTimeout(() => {
-      Promise.all([listGroups(), listMaterials({ tab, q: query.trim(), sort })])
+      Promise.all([listGroups(profileId), listMaterials(profileId, { tab, q: query.trim(), sort })])
         .then(([grps, mats]) => {
           if (cancelled) return
           setGroups(grps)
@@ -112,7 +108,7 @@ export default function MaterialsPage() {
           if (cancelled) return
           setGroups([])
           setMaterials([])
-          setAlert({ variant: 'danger', title: 'Could not load materials', message: errMessage(e) })
+          setAlert({ variant: 'danger', title: 'Could not load inventory', message: errMessage(e) })
         })
         .finally(() => !cancelled && setLoading(false))
     }, 250)
@@ -121,7 +117,7 @@ export default function MaterialsPage() {
       clearTimeout(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, query, sort, reloadKey])
+  }, [profileId, tab, query, sort, reloadKey])
 
   const [editingId, setEditingId] = useState(null)
   const [editLoadingId, setEditLoadingId] = useState(null)
@@ -256,8 +252,8 @@ export default function MaterialsPage() {
     })
     try {
       await Promise.all([
-        ...changed.map((r) => updateMaterial(r.id, r)),
-        ...removedIds.map((id) => archiveMaterial(id)),
+        ...changed.map((r) => updateMaterial(profileId, r.id, r)),
+        ...removedIds.map((id) => archiveMaterial(profileId, id)),
       ])
       setAlert({ variant: 'success', title: 'Changes saved.' })
       exitEdit()
@@ -269,7 +265,7 @@ export default function MaterialsPage() {
 
   async function handleAddMaterial(values) {
     try {
-      await createMaterial(values)
+      await createMaterial(profileId, values)
     } catch (e) {
       setAlert({ variant: 'danger', title: 'Could not add material', message: errMessage(e) })
       throw e // keep the modal open
@@ -284,9 +280,9 @@ export default function MaterialsPage() {
     const { action, items } = pending
     const ids = items.map((it) => it.id)
     try {
-      if (action === 'delete') await Promise.all(ids.map((id) => deleteMaterial(id)))
-      else if (action === 'restore') await Promise.all(ids.map((id) => restoreMaterial(id)))
-      else await Promise.all(ids.map((id) => archiveMaterial(id)))
+      if (action === 'delete') await Promise.all(ids.map((id) => deleteMaterial(profileId, id)))
+      else if (action === 'restore') await Promise.all(ids.map((id) => restoreMaterial(profileId, id)))
+      else await Promise.all(ids.map((id) => archiveMaterial(profileId, id)))
       setAlert(actionAlert(action, items, 'material'))
       reload()
     } catch (e) {
@@ -295,266 +291,272 @@ export default function MaterialsPage() {
   }
 
   return (
-    <div className="min-h-full bg-component-bg">
-      <AppHeader />
+    <div>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => guard(onBack)}
+          aria-label="Back"
+          className="rounded-md p-1 text-content transition-colors hover:bg-white"
+        >
+          <ArrowLeft className="h-6 w-6" />
+        </button>
+        <h1 className="text-2xl font-extrabold text-content">{profileName} Inventory</h1>
+      </div>
 
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        <h1 className="text-2xl font-extrabold text-content">Materials</h1>
-
-        <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-content-muted" />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search Material..."
-              className="w-full rounded-lg border border-purple-light bg-white py-3 pl-10 pr-4 text-base text-content outline-none transition-colors placeholder:text-content-muted focus:border-purple focus:ring-2 focus:ring-purple-light"
-            />
-          </div>
-
-          <Select
-            wrapperClassName="w-full md:w-56"
-            placeholder="Sort By"
-            value={sort}
-            onChange={setSort}
-            options={SORT_OPTIONS}
+      <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-content-muted" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search Material..."
+            className="w-full rounded-lg border border-purple-light bg-white py-3 pl-10 pr-4 text-base text-content outline-none transition-colors placeholder:text-content-muted focus:border-purple focus:ring-2 focus:ring-purple-light"
           />
-
-          {tab === 'active' && (
-            <button
-              type="button"
-              onClick={() => setAddMaterialOpen(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-transparent bg-success px-4 py-3 text-base font-bold text-white transition-colors hover:bg-success-hover md:ml-auto"
-            >
-              <Plus className="h-4 w-4" />
-              Add Material
-            </button>
-          )}
         </div>
 
-        {alert && (
-          <div className="mt-4">
-            <Alert variant={alert.variant} title={alert.title} onDismiss={() => setAlert(null)}>
-              {alert.message}
-            </Alert>
-          </div>
+        <Select
+          wrapperClassName="w-full md:w-56"
+          placeholder="Sort By"
+          value={sort}
+          onChange={setSort}
+          options={SORT_OPTIONS}
+        />
+
+        {tab === 'active' && (
+          <button
+            type="button"
+            onClick={() => setAddMaterialOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-transparent bg-success px-4 py-3 text-base font-bold text-white transition-colors hover:bg-success-hover md:ml-auto"
+          >
+            <Plus className="h-4 w-4" />
+            Add Material
+          </button>
         )}
+      </div>
 
+      {alert && (
         <div className="mt-4">
-          <SegmentedTabs
-            value={tab}
-            options={TABS}
-            onChange={(v) =>
-              guard(() => {
-                setTab(v)
-                exitEdit()
-              })
-            }
-          />
+          <Alert variant={alert.variant} title={alert.title} onDismiss={() => setAlert(null)}>
+            {alert.message}
+          </Alert>
         </div>
+      )}
 
-        <div className="mt-6 space-y-4">
-          {loading && <Loading label="Loading materials..." />}
-          {!loading && visibleGroups.map((group) => {
-            const editing = editingId === group.id
-            const open = editing || term ? true : expanded.has(group.id)
-            const rows = editing ? draft : materialsFor(group.id)
+      <div className="mt-4">
+        <SegmentedTabs
+          value={tab}
+          options={TABS}
+          onChange={(v) =>
+            guard(() => {
+              setTab(v)
+              exitEdit()
+            })
+          }
+        />
+      </div>
 
-            return (
-              <div
-                key={group.id}
-                className="overflow-hidden rounded-xl border border-purple-light bg-white"
-              >
-                <div className="flex items-center gap-3 bg-purple px-5 py-3 text-white">
-                  <span className="flex-1 font-bold">{group.name}</span>
+      <div className="mt-6 space-y-4">
+        {loading && <Loading label="Loading inventory..." />}
+        {!loading && visibleGroups.map((group) => {
+          const editing = editingId === group.id
+          const open = editing || term ? true : expanded.has(group.id)
+          const rows = editing ? draft : materialsFor(group.id)
 
-                  {editing ? (
-                    <>
-                      {errorCount > 0 && (
-                        <span className="rounded bg-danger px-2 py-1 text-xs font-bold">
-                          {errorCount === 1 ? '1 field needs fixing' : `${errorCount} fields need fixing`}
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setConfirmUndo(true)}
-                        className="rounded-md bg-danger px-3 py-1.5 text-xs font-bold transition-colors hover:bg-danger-hover"
-                      >
-                        Undo All
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmSave(true)}
-                        disabled={errorCount > 0}
-                        title={errorCount > 0 ? 'Fix the highlighted fields first.' : undefined}
-                        className="rounded-md bg-info px-3 py-1.5 text-xs font-bold transition-colors hover:bg-info-hover disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        Save Changes
-                      </button>
-                    </>
-                  ) : tab === 'active' ? (
-                    <>
-                      {activeInGroup(group.id).length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPending({
-                              action: 'archive',
-                              items: activeInGroup(group.id).map(matItem),
-                            })
-                          }
-                          aria-label="Archive group"
-                          className="rounded-md bg-warning p-1.5 transition-colors hover:bg-warning-hover"
-                        >
-                          <Archive className="h-4 w-4" />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => startEdit(group.id)}
-                        disabled={editLoadingId === group.id}
-                        aria-label="Edit materials"
-                        className="rounded-md bg-info p-1.5 transition-colors hover:bg-info-hover disabled:opacity-60"
-                      >
-                        {editLoadingId === group.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Pencil className="h-4 w-4" />
-                        )}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPending({
-                            action: 'restore',
-                            items: archivedInGroup(group.id).map(matItem),
-                          })
-                        }
-                        className="rounded-md bg-warning px-3 py-1.5 text-xs font-bold transition-colors hover:bg-warning-hover"
-                      >
-                        Restore
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPending({
-                            action: 'delete',
-                            items: archivedInGroup(group.id).map(matItem),
-                          })
-                        }
-                        className="rounded-md bg-danger px-3 py-1.5 text-xs font-bold transition-colors hover:bg-danger-hover"
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
+          return (
+            <div
+              key={group.id}
+              className="overflow-hidden rounded-xl border border-purple-light bg-white"
+            >
+              <div className="flex items-center gap-3 bg-purple px-5 py-3 text-white">
+                <span className="flex-1 font-bold">{group.name}</span>
 
-                  <button
-                    type="button"
-                    onClick={() => !editing && toggle(group.id)}
-                    aria-label={open ? 'Collapse' : 'Expand'}
-                    className={`rounded-md p-1 transition-colors hover:bg-white/10 ${
-                      editing ? 'opacity-40' : ''
-                    }`}
-                  >
-                    {open ? (
-                      <ChevronDown className="h-5 w-5" />
-                    ) : (
-                      <ChevronRight className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-
-                {open && (
+                {editing ? (
                   <>
-                    <div className="hidden overflow-x-auto md:block">
-                      <MaterialTable
-                        rows={rows}
-                        editing={editing}
-                        tab={tab}
-                        errors={errors}
-                        onCell={updateCell}
-                        onRemove={(row) => removeDraftRow(row.id)}
-                        onArchive={(row) =>
-                          setPending({ action: 'archive', items: [matItem(row)] })
+                    {errorCount > 0 && (
+                      <span className="rounded bg-danger px-2 py-1 text-xs font-bold">
+                        {errorCount === 1 ? '1 field needs fixing' : `${errorCount} fields need fixing`}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setConfirmUndo(true)}
+                      className="rounded-md bg-danger px-3 py-1.5 text-xs font-bold transition-colors hover:bg-danger-hover"
+                    >
+                      Undo All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmSave(true)}
+                      disabled={errorCount > 0}
+                      title={errorCount > 0 ? 'Fix the highlighted fields first.' : undefined}
+                      className="rounded-md bg-info px-3 py-1.5 text-xs font-bold transition-colors hover:bg-info-hover disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Save Changes
+                    </button>
+                  </>
+                ) : tab === 'active' ? (
+                  <>
+                    {activeInGroup(group.id).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPending({
+                            action: 'archive',
+                            items: activeInGroup(group.id).map(matItem),
+                          })
                         }
-                        onRestore={(row) =>
-                          setPending({ action: 'restore', items: [matItem(row)] })
-                        }
-                        onDelete={(row) =>
-                          setPending({ action: 'delete', items: [matItem(row)] })
-                        }
-                        onEdit={() => startEdit(group.id)}
-                      />
-                    </div>
-
-                    <div className="divide-y divide-purple-light md:hidden">
-                      {rows.length === 0 ? (
-                        <p className="px-5 py-6 text-center text-sm text-content-muted">
-                          No materials.
-                        </p>
+                        aria-label="Archive group"
+                        className="rounded-md bg-warning p-1.5 transition-colors hover:bg-warning-hover"
+                      >
+                        <Archive className="h-4 w-4" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => startEdit(group.id)}
+                      disabled={editLoadingId === group.id}
+                      aria-label="Edit materials"
+                      className="rounded-md bg-info p-1.5 transition-colors hover:bg-info-hover disabled:opacity-60"
+                    >
+                      {editLoadingId === group.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        rows.map((row) => (
-                          <MaterialRow
-                            key={row.id}
-                            row={row}
-                            editing={editing}
-                            tab={tab}
-                            errors={errors[row.id] || {}}
-                            onCell={updateCell}
-                            onRemove={() => removeDraftRow(row.id)}
-                            onArchive={() =>
-                              setPending({ action: 'archive', items: [matItem(row)] })
-                            }
-                            onRestore={() =>
-                              setPending({ action: 'restore', items: [matItem(row)] })
-                            }
-                            onDelete={() =>
-                              setPending({ action: 'delete', items: [matItem(row)] })
-                            }
-                            onEdit={() => startEdit(group.id)}
-                          />
-                        ))
+                        <Pencil className="h-4 w-4" />
                       )}
-                    </div>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPending({
+                          action: 'restore',
+                          items: archivedInGroup(group.id).map(matItem),
+                        })
+                      }
+                      className="rounded-md bg-warning px-3 py-1.5 text-xs font-bold transition-colors hover:bg-warning-hover"
+                    >
+                      Restore
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPending({
+                          action: 'delete',
+                          items: archivedInGroup(group.id).map(matItem),
+                        })
+                      }
+                      className="rounded-md bg-danger px-3 py-1.5 text-xs font-bold transition-colors hover:bg-danger-hover"
+                    >
+                      Delete
+                    </button>
                   </>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => !editing && toggle(group.id)}
+                  aria-label={open ? 'Collapse' : 'Expand'}
+                  className={`rounded-md p-1 transition-colors hover:bg-white/10 ${
+                    editing ? 'opacity-40' : ''
+                  }`}
+                >
+                  {open ? (
+                    <ChevronDown className="h-5 w-5" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5" />
+                  )}
+                </button>
               </div>
-            )
-          })}
 
-          {!loading && visibleGroups.length === 0 && (
-            <EmptyState
-              icon={tab === 'archive' ? Archive : Package}
-              title={
-                term
-                  ? `No materials match "${query.trim()}"`
-                  : tab === 'archive'
-                    ? 'Archive is empty'
-                    : 'No materials yet'
-              }
-              subtitle={
-                term
-                  ? 'Try a different search term.'
-                  : tab === 'archive'
-                    ? 'Materials you archive will show up here.'
-                    : 'Use “Add Material” to create your first one.'
-              }
-            />
-          )}
-        </div>
+              {open && (
+                <>
+                  <div className="hidden overflow-x-auto md:block">
+                    <MaterialTable
+                      rows={rows}
+                      editing={editing}
+                      tab={tab}
+                      errors={errors}
+                      onCell={updateCell}
+                      onRemove={(row) => removeDraftRow(row.id)}
+                      onArchive={(row) =>
+                        setPending({ action: 'archive', items: [matItem(row)] })
+                      }
+                      onRestore={(row) =>
+                        setPending({ action: 'restore', items: [matItem(row)] })
+                      }
+                      onDelete={(row) =>
+                        setPending({ action: 'delete', items: [matItem(row)] })
+                      }
+                      onEdit={() => startEdit(group.id)}
+                    />
+                  </div>
 
-        {editingId && (
-          <p className="mt-4 text-sm text-content-muted">
-            Editing — <span className="font-semibold">Ctrl&nbsp;+&nbsp;Z</span> undoes your last
-            change, or use Undo&nbsp;All.
-          </p>
+                  <div className="divide-y divide-purple-light md:hidden">
+                    {rows.length === 0 ? (
+                      <p className="px-5 py-6 text-center text-sm text-content-muted">
+                        No materials.
+                      </p>
+                    ) : (
+                      rows.map((row) => (
+                        <MaterialRow
+                          key={row.id}
+                          row={row}
+                          editing={editing}
+                          tab={tab}
+                          errors={errors[row.id] || {}}
+                          onCell={updateCell}
+                          onRemove={() => removeDraftRow(row.id)}
+                          onArchive={() =>
+                            setPending({ action: 'archive', items: [matItem(row)] })
+                          }
+                          onRestore={() =>
+                            setPending({ action: 'restore', items: [matItem(row)] })
+                          }
+                          onDelete={() =>
+                            setPending({ action: 'delete', items: [matItem(row)] })
+                          }
+                          onEdit={() => startEdit(group.id)}
+                        />
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })}
+
+        {!loading && visibleGroups.length === 0 && (
+          <EmptyState
+            icon={tab === 'archive' ? Archive : Package}
+            title={
+              term
+                ? `No materials match "${query.trim()}"`
+                : tab === 'archive'
+                  ? 'Archive is empty'
+                  : 'No materials yet'
+            }
+            subtitle={
+              term
+                ? 'Try a different search term.'
+                : tab === 'archive'
+                  ? 'Materials you archive will show up here.'
+                  : 'Use “Add Material” to create your first one.'
+            }
+          />
         )}
-      </main>
+      </div>
+
+      {editingId && (
+        <p className="mt-4 text-sm text-content-muted">
+          Editing — <span className="font-semibold">Ctrl&nbsp;+&nbsp;Z</span> undoes your last
+          change, or use Undo&nbsp;All.
+        </p>
+      )}
 
       <AddMaterialModal
         open={addMaterialOpen}
@@ -615,9 +617,6 @@ export default function MaterialsPage() {
 }
 
 function MaterialTable({ rows, editing, tab, errors = {}, onCell, onRemove, onArchive, onRestore, onDelete, onEdit }) {
-  const input =
-    'w-full rounded border border-purple-light bg-white px-2 py-1 text-sm outline-none focus:border-purple focus:ring-1 focus:ring-purple-light'
-
   return (
     <table className="w-full min-w-[560px] text-sm">
       <thead>
